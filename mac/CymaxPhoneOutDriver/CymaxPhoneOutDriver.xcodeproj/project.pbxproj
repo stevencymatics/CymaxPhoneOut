@@ -1,0 +1,336 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		C10000001000000000000001 /* PluginEntry.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C20000001000000000000001 /* PluginEntry.cpp */; };
+		C10000001000000000000002 /* CymaxAudioObject.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C20000001000000000000002 /* CymaxAudioObject.cpp */; };
+		C10000001000000000000003 /* CymaxAudioDevice.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C20000001000000000000003 /* CymaxAudioDevice.cpp */; };
+		C10000001000000000000004 /* CymaxAudioStream.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C20000001000000000000004 /* CymaxAudioStream.cpp */; };
+		C10000001000000000000005 /* UDPSender.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C20000001000000000000005 /* UDPSender.cpp */; };
+		C10000001000000000000010 /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C20000001000000000000010 /* CoreAudio.framework */; };
+		C10000001000000000000011 /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C20000001000000000000011 /* CoreFoundation.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		C20000001000000000000001 /* PluginEntry.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = PluginEntry.cpp; sourceTree = "<group>"; };
+		C20000001000000000000002 /* CymaxAudioObject.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = CymaxAudioObject.cpp; sourceTree = "<group>"; };
+		C20000001000000000000003 /* CymaxAudioDevice.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = CymaxAudioDevice.cpp; sourceTree = "<group>"; };
+		C20000001000000000000004 /* CymaxAudioStream.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = CymaxAudioStream.cpp; sourceTree = "<group>"; };
+		C20000001000000000000005 /* UDPSender.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = UDPSender.cpp; sourceTree = "<group>"; };
+		C20000001000000000000006 /* CymaxPluginInterface.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = CymaxPluginInterface.hpp; sourceTree = "<group>"; };
+		C20000001000000000000007 /* CymaxAudioObject.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = CymaxAudioObject.hpp; sourceTree = "<group>"; };
+		C20000001000000000000008 /* CymaxAudioDevice.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = CymaxAudioDevice.hpp; sourceTree = "<group>"; };
+		C20000001000000000000009 /* CymaxAudioStream.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = CymaxAudioStream.hpp; sourceTree = "<group>"; };
+		C2000000100000000000000A /* UDPSender.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = UDPSender.hpp; sourceTree = "<group>"; };
+		C2000000100000000000000B /* RingBuffer.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = RingBuffer.hpp; sourceTree = "<group>"; };
+		C2000000100000000000000C /* Logging.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Logging.hpp; sourceTree = "<group>"; };
+		C20000001000000000000010 /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
+		C20000001000000000000011 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
+		C20000001000000000000020 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		C20000001000000000000021 /* CymaxPhoneOutDriver.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CymaxPhoneOutDriver.entitlements; sourceTree = "<group>"; };
+		C20000001000000000000099 /* CymaxPhoneOutDriver.driver */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CymaxPhoneOutDriver.driver; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		C30000001000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C10000001000000000000010 /* CoreAudio.framework in Frameworks */,
+				C10000001000000000000011 /* CoreFoundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		C40000001000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				C40000001000000000000002 /* Source */,
+				C40000001000000000000003 /* Frameworks */,
+				C40000001000000000000004 /* Products */,
+				C20000001000000000000020 /* Info.plist */,
+				C20000001000000000000021 /* CymaxPhoneOutDriver.entitlements */,
+			);
+			sourceTree = "<group>";
+		};
+		C40000001000000000000002 /* Source */ = {
+			isa = PBXGroup;
+			children = (
+				C20000001000000000000001 /* PluginEntry.cpp */,
+				C20000001000000000000006 /* CymaxPluginInterface.hpp */,
+				C20000001000000000000002 /* CymaxAudioObject.cpp */,
+				C20000001000000000000007 /* CymaxAudioObject.hpp */,
+				C20000001000000000000003 /* CymaxAudioDevice.cpp */,
+				C20000001000000000000008 /* CymaxAudioDevice.hpp */,
+				C20000001000000000000004 /* CymaxAudioStream.cpp */,
+				C20000001000000000000009 /* CymaxAudioStream.hpp */,
+				C20000001000000000000005 /* UDPSender.cpp */,
+				C2000000100000000000000A /* UDPSender.hpp */,
+				C2000000100000000000000B /* RingBuffer.hpp */,
+				C2000000100000000000000C /* Logging.hpp */,
+			);
+			path = Source;
+			sourceTree = "<group>";
+		};
+		C40000001000000000000003 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				C20000001000000000000010 /* CoreAudio.framework */,
+				C20000001000000000000011 /* CoreFoundation.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		C40000001000000000000004 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				C20000001000000000000099 /* CymaxPhoneOutDriver.driver */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		C50000001000000000000001 /* CymaxPhoneOutDriver */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C70000001000000000000001 /* Build configuration list for PBXNativeTarget "CymaxPhoneOutDriver" */;
+			buildPhases = (
+				C60000001000000000000001 /* Sources */,
+				C30000001000000000000001 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CymaxPhoneOutDriver;
+			productName = CymaxPhoneOutDriver;
+			productReference = C20000001000000000000099 /* CymaxPhoneOutDriver.driver */;
+			productType = "com.apple.product-type.bundle";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		C00000001000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					C50000001000000000000001 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = C70000001000000000000002 /* Build configuration list for PBXProject "CymaxPhoneOutDriver" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = C40000001000000000000001;
+			productRefGroup = C40000001000000000000004 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				C50000001000000000000001 /* CymaxPhoneOutDriver */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		C60000001000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C10000001000000000000001 /* PluginEntry.cpp in Sources */,
+				C10000001000000000000002 /* CymaxAudioObject.cpp in Sources */,
+				C10000001000000000000003 /* CymaxAudioDevice.cpp in Sources */,
+				C10000001000000000000004 /* CymaxAudioStream.cpp in Sources */,
+				C10000001000000000000005 /* UDPSender.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		C80000001000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		C80000001000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		C80000001000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Info.plist;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2024 Cymax. All rights reserved.";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Audio/Plug-Ins/HAL";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cymax.phoneoutdriver;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				WRAPPER_EXTENSION = driver;
+			};
+			name = Debug;
+		};
+		C80000001000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Info.plist;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2024 Cymax. All rights reserved.";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Audio/Plug-Ins/HAL";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cymax.phoneoutdriver;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				WRAPPER_EXTENSION = driver;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		C70000001000000000000001 /* Build configuration list for PBXNativeTarget "CymaxPhoneOutDriver" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C80000001000000000000003 /* Debug */,
+				C80000001000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C70000001000000000000002 /* Build configuration list for PBXProject "CymaxPhoneOutDriver" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C80000001000000000000001 /* Debug */,
+				C80000001000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = C00000001000000000000001 /* Project object */;
+}
+
