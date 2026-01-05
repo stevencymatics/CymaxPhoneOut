@@ -204,22 +204,28 @@ void UDPSender::updateConfig(const UDPSenderConfig& config) {
                    config.sampleRate, config.channels);
 }
 
+size_t UDPSender::ringBufferHighWater() const {
+    if (m_ringBuffer) {
+        return m_ringBuffer->highWaterMark();
+    }
+    return 0;
+}
+
+void UDPSender::resetRingBufferHighWater() {
+    if (m_ringBuffer) {
+        m_ringBuffer->resetHighWaterMark();
+    }
+}
+
 void UDPSender::senderThreadFunc() {
     CYMAX_LOG_INFO("UDPSender: thread started");
     
     // Set thread priority (not real-time, but elevated)
     pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0);
     
-    // Calculate timing
-    const double packetDurationSecs = static_cast<double>(m_config.framesPerPacket) / 
-                                       static_cast<double>(m_config.sampleRate);
-    const uint64_t targetIntervalNanos = static_cast<uint64_t>(packetDurationSecs * 1e9);
-    
     // Preallocate read buffer for audio samples
     const size_t samplesPerPacket = m_config.framesPerPacket * m_config.channels;
     std::vector<float> audioSamples(samplesPerPacket);
-    
-    uint64_t nextSendTime = mach_absolute_time();
     
     while (!m_shouldStop.load(std::memory_order_acquire)) {
         // Check if we have a destination
@@ -242,7 +248,6 @@ void UDPSender::senderThreadFunc() {
         
         if (framesRead < m_config.framesPerPacket) {
             // Not enough data yet, wait a bit
-            // This is normal during startup or low-activity periods
             struct timespec ts = {0, 500000};  // 0.5ms
             nanosleep(&ts, nullptr);
             continue;
@@ -255,7 +260,7 @@ void UDPSender::senderThreadFunc() {
         header->timestamp = machTimeToNanos(mach_absolute_time());
         header->sampleRate = m_config.sampleRate;
         header->channels = m_config.channels;
-        header->frameCount = m_config.framesPerPacket;
+        header->frameCount = static_cast<uint16_t>(framesRead);
         header->format = m_config.useFloat32 ? 1 : 2;
         header->flags = 0;
         
@@ -271,20 +276,14 @@ void UDPSender::senderThreadFunc() {
         
         if (sent < 0) {
             if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                // Real error
                 m_packetsDropped.fetch_add(1, std::memory_order_relaxed);
                 CYMAX_LOG_NETWORK("UDPSender: send failed: %{public}s", strerror(errno));
             }
-            // For EAGAIN/EWOULDBLOCK, packet is dropped (non-blocking behavior)
         } else {
             m_packetsSent.fetch_add(1, std::memory_order_relaxed);
         }
         
-        // Pace ourselves to avoid busy-looping
-        // Use a simple timing approach - send when we have data
-        // The ring buffer naturally rate-limits based on render callback rate
-        
-        // Small yield to prevent CPU spinning if we're ahead
+        // Small yield to prevent CPU spinning
         struct timespec ts = {0, 100000};  // 0.1ms
         nanosleep(&ts, nullptr);
     }

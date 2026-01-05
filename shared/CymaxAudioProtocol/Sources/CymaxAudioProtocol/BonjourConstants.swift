@@ -49,16 +49,17 @@ public enum CymaxNetwork {
     /// MTU is typically 1500, minus IP header (20) and UDP header (8)
     public static let maxUDPPayload = 1472
     
-    /// Audio packet header size in bytes
-    public static let audioHeaderSize = 24
+    /// Audio packet header size in bytes (actual header is 28 bytes)
+    /// Struct: magic(4) + seq(4) + timestamp(8) + sampleRate(4) + channels(2) + frameCount(2) + format(2) + flags(2) = 28
+    public static let audioHeaderSize = 28
     
     /// Maximum audio payload per packet (bytes)
     public static let maxAudioPayload = maxUDPPayload - audioHeaderSize
     
     /// Default frames per UDP packet
-    /// At 48kHz stereo Float32: 256 frames * 2ch * 4 bytes = 2048 bytes
-    /// This fits comfortably in one UDP packet
-    public static let defaultFramesPerPacket: UInt16 = 256
+    /// At 48kHz stereo Float32: 128 frames * 2ch * 4 bytes = 1024 bytes
+    /// Total packet: 28 header + 1024 audio = 1052 bytes (well under MTU)
+    public static let defaultFramesPerPacket: UInt16 = 128
     
     /// Socket receive buffer size (bytes)
     public static let socketReceiveBuffer = 262144  // 256KB

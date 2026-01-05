@@ -35,8 +35,8 @@ enum LatencyMode: String, CaseIterable {
     
     var jitterBufferMs: Double {
         switch self {
-        case .lowLatency: return 150.0   // 150ms prebuffer for lower latency
-        case .stable: return 300.0       // 300ms prebuffer for stability
+        case .lowLatency: return 250.0   // 250ms prebuffer for lower latency
+        case .stable: return 400.0       // 400ms prebuffer for stability
         }
     }
 }
@@ -57,6 +57,7 @@ class ReceiverState: ObservableObject {
     @Published var packetsReceived: UInt64 = 0
     @Published var packetsLost: UInt64 = 0
     @Published var packetsDropped: UInt64 = 0
+    @Published var underrunCount: Int = 0
     @Published var jitterMs: Double = 0
     @Published var bufferLevelMs: Double = 0
     @Published var lossPercentage: Double = 0
@@ -295,6 +296,7 @@ class ReceiverState: ObservableObject {
         
         if let player = audioPlayer {
             bufferLevelMs = player.getBufferLevelMs()
+            underrunCount = player.getUnderrunCount()
         }
         
         let total = packetsReceived + packetsLost
@@ -315,6 +317,7 @@ class ReceiverState: ObservableObject {
         packetsReceived = 0
         packetsLost = 0
         packetsDropped = 0
+        underrunCount = 0
         jitterMs = 0
         bufferLevelMs = 0
         lossPercentage = 0

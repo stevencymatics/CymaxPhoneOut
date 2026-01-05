@@ -9,12 +9,12 @@
 //  - Query/set sample rate and buffer size
 //
 //  MVP Implementation:
-//  Uses CFPreferences as a simple IPC mechanism.
-//  The driver reads from the same preference domain.
+//  Uses a file at /tmp/cymax_dest_ip.txt as a simple IPC mechanism.
+//  The driver reads from this file when startIO() is called.
 //
-//  Production Migration:
-//  Should use custom AudioObject properties via AudioObjectSetPropertyData
-//  or XPC + shared memory for better architecture.
+//  For web mode, we set the destination to 127.0.0.1 (localhost)
+//  so the audio is sent to the menubar app's UDP receiver,
+//  which then forwards it via WebSocket to browser clients.
 //
 
 import Foundation
@@ -22,7 +22,10 @@ import CoreAudio
 
 /// Communication with the Cymax Phone Out audio driver
 class DriverCommunication {
-    /// CFPreferences domain for driver communication
+    /// File path for destination IP (shared with driver)
+    private let destIPFilePath = "/tmp/cymax_dest_ip.txt"
+    
+    /// CFPreferences domain for driver communication (legacy)
     private let preferencesDomain = "com.cymax.phoneoutdriver" as CFString
     
     /// Keys for preferences
@@ -51,17 +54,16 @@ class DriverCommunication {
     // MARK: - Destination IP
     
     /// Set the destination IP address for UDP audio packets
+    /// For web mode, use "127.0.0.1" to send to local UDP receiver
     func setDestinationIP(_ ipAddress: String) {
         log("Setting destination IP to \(ipAddress)")
         
         // Write to /tmp which is accessible to everyone including coreaudiod
-        let filePath = "/tmp/cymax_dest_ip.txt"
-        
         do {
-            try ipAddress.write(toFile: filePath, atomically: true, encoding: .utf8)
+            try ipAddress.write(toFile: destIPFilePath, atomically: true, encoding: .utf8)
             // Make sure it's world-readable
-            try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: filePath)
-            log("✓ Wrote IP to \(filePath)")
+            try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: destIPFilePath)
+            log("✓ Wrote IP to \(destIPFilePath)")
         } catch {
             log("⚠ Failed to write IP file: \(error.localizedDescription)")
         }
@@ -69,27 +71,27 @@ class DriverCommunication {
     
     /// Clear the destination IP address
     func clearDestinationIP() {
-        CFPreferencesSetValue(
-            PrefKey.destinationIP,
-            nil,
-            preferencesDomain,
-            kCFPreferencesCurrentUser,
-            kCFPreferencesAnyHost
-        )
-        CFPreferencesAppSynchronize(preferencesDomain)
+        log("Clearing destination IP")
         
-        setDriverProperty(selector: 0x44737449 /* 'DstI' */, value: "")
+        // Remove the file
+        do {
+            if FileManager.default.fileExists(atPath: destIPFilePath) {
+                try FileManager.default.removeItem(atPath: destIPFilePath)
+                log("✓ Removed IP file")
+            }
+        } catch {
+            log("⚠ Failed to remove IP file: \(error.localizedDescription)")
+        }
     }
     
-    /// Get the current destination IP address
+    /// Get the current destination IP address from file
     func getDestinationIP() -> String? {
-        let value = CFPreferencesCopyValue(
-            PrefKey.destinationIP,
-            preferencesDomain,
-            kCFPreferencesCurrentUser,
-            kCFPreferencesAnyHost
-        )
-        return value as? String
+        do {
+            let ip = try String(contentsOfFile: destIPFilePath, encoding: .utf8)
+            return ip.trimmingCharacters(in: .whitespacesAndNewlines)
+        } catch {
+            return nil
+        }
     }
     
     // MARK: - Sample Rate
@@ -221,46 +223,4 @@ class DriverCommunication {
         guard status == noErr else { return nil }
         return uid as String?
     }
-    
-    /// Set a custom property on the driver
-    private func setDriverProperty(selector: AudioObjectPropertySelector, value: String) {
-        guard let deviceID = findDevice() else {
-            log("⚠ Driver not found - IP not sent to driver")
-            return
-        }
-        
-        var propertyAddress = AudioObjectPropertyAddress(
-            mSelector: selector,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-        
-        // Check if property exists
-        let hasProperty = AudioObjectHasProperty(deviceID, &propertyAddress)
-        
-        guard hasProperty else {
-            log("⚠ Property not found on driver")
-            return
-        }
-        
-        // Set the property
-        var cString = Array(value.utf8CString)
-        let dataSize = UInt32(cString.count)
-        
-        let status = AudioObjectSetPropertyData(
-            deviceID,
-            &propertyAddress,
-            0,
-            nil,
-            dataSize,
-            &cString
-        )
-        
-        if status == noErr {
-            log("✓ Destination IP sent to driver")
-        } else {
-            log("⚠ Failed to set driver IP, error: \(status)")
-        }
-    }
 }
-

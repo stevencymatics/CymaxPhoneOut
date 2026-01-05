@@ -198,25 +198,20 @@ OSStatus AudioStream::getPropertyData(const AudioObjectPropertyAddress* address,
         
         case kAudioStreamPropertyAvailableVirtualFormats:
         case kAudioStreamPropertyAvailablePhysicalFormats: {
-            if (inDataSize < 2 * sizeof(AudioStreamRangedDescription)) {
+            // Only 48kHz supported - iOS hardware requires it
+            if (inDataSize < sizeof(AudioStreamRangedDescription)) {
                 return kAudioHardwareBadPropertySizeError;
             }
             
             AudioStreamRangedDescription* formats = static_cast<AudioStreamRangedDescription*>(outData);
             
-            // 48kHz format
+            // 48kHz format only
             formats[0].mFormat = getPhysicalFormat();
             formats[0].mFormat.mSampleRate = 48000.0;
             formats[0].mSampleRateRange.mMinimum = 48000.0;
             formats[0].mSampleRateRange.mMaximum = 48000.0;
             
-            // 44.1kHz format
-            formats[1].mFormat = getPhysicalFormat();
-            formats[1].mFormat.mSampleRate = 44100.0;
-            formats[1].mSampleRateRange.mMinimum = 44100.0;
-            formats[1].mSampleRateRange.mMaximum = 44100.0;
-            
-            *outDataSize = 2 * sizeof(AudioStreamRangedDescription);
+            *outDataSize = sizeof(AudioStreamRangedDescription);
             return noErr;
         }
         
@@ -242,13 +237,13 @@ OSStatus AudioStream::setPropertyData(const AudioObjectPropertyAddress* address,
             if (inDataSize < sizeof(AudioStreamBasicDescription)) return kAudioHardwareBadPropertySizeError;
             const AudioStreamBasicDescription* format = static_cast<const AudioStreamBasicDescription*>(inData);
             
-            // Validate sample rate
-            if (format->mSampleRate != 44100.0 && format->mSampleRate != 48000.0) {
-                CYMAX_LOG_ERROR("Unsupported sample rate: %.0f", format->mSampleRate);
-                return kAudioDeviceUnsupportedFormatError;
+            // Only 48000Hz supported - iOS hardware requires it
+            if (format->mSampleRate != 48000.0) {
+                CYMAX_LOG_INFO("Ignoring sample rate %.0f, keeping 48000Hz", format->mSampleRate);
+                // Don't return error, just silently keep 48000Hz
+            } else {
+                m_sampleRate = format->mSampleRate;
             }
-            
-            m_sampleRate = format->mSampleRate;
             CYMAX_LOG_INFO("Stream %u format set: %.0f Hz", m_objectID, m_sampleRate);
             return noErr;
         }

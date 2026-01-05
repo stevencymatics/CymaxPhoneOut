@@ -126,7 +126,18 @@ public:
     size_t availableForRead() const {
         const size_t writeIdx = m_writeIndex.load(std::memory_order_acquire);
         const size_t readIdx = m_readIndex.load(std::memory_order_relaxed);
-        return (writeIdx - readIdx) & m_mask;
+        const size_t available = (writeIdx - readIdx) & m_mask;
+        
+        // Update high water mark (relaxed is fine, this is just stats)
+        size_t current = m_highWaterMark.load(std::memory_order_relaxed);
+        while (available > current) {
+            if (m_highWaterMark.compare_exchange_weak(current, available, 
+                    std::memory_order_relaxed, std::memory_order_relaxed)) {
+                break;
+            }
+        }
+        
+        return available;
     }
     
     /// Get number of frames available for writing (before overwrite)
@@ -149,11 +160,22 @@ public:
         return m_channelCount;
     }
     
+    /// Get the high water mark (peak buffer fill level in frames)
+    size_t highWaterMark() const {
+        return m_highWaterMark.load(std::memory_order_relaxed);
+    }
+    
+    /// Reset high water mark (call periodically to get peak over time window)
+    void resetHighWaterMark() {
+        m_highWaterMark.store(0, std::memory_order_relaxed);
+    }
+    
     /// Reset the buffer (called when stopping IO)
     /// @warning Only call when no read/write operations are in progress
     void reset() {
         m_writeIndex.store(0, std::memory_order_relaxed);
         m_readIndex.store(0, std::memory_order_relaxed);
+        m_highWaterMark.store(0, std::memory_order_relaxed);
         std::memset(m_buffer, 0, m_sampleCapacity * sizeof(T));
     }
     
@@ -189,6 +211,9 @@ private:
     // Atomic indices on separate cache lines to avoid false sharing
     alignas(64) std::atomic<size_t> m_writeIndex;
     alignas(64) std::atomic<size_t> m_readIndex;
+    
+    // Statistics
+    mutable std::atomic<size_t> m_highWaterMark{0};
 };
 
 } // namespace Cymax

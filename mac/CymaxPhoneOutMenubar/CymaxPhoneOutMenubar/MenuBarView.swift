@@ -2,7 +2,7 @@
 //  MenuBarView.swift
 //  CymaxPhoneOutMenubar
 //
-//  Main menubar popover view
+//  Main menubar popover view - Simplified web-only version
 //
 
 import SwiftUI
@@ -18,8 +18,8 @@ struct MenuBarView: View {
             
             Divider()
             
-            // Device selection
-            deviceSelectionView
+            // QR Code & Connection
+            connectionView
             
             Divider()
             
@@ -43,23 +43,20 @@ struct MenuBarView: View {
         }
         .padding()
         .frame(width: 320)
-        .onAppear {
-            appState.startBrowsing()
-        }
     }
     
     // MARK: - Header
     
     private var headerView: some View {
         HStack {
-            Image(systemName: "antenna.radiowaves.left.and.right")
+            Image(systemName: "waveform")
                 .font(.title2)
-                .foregroundStyle(appState.isStreaming ? .green : .secondary)
+                .foregroundStyle(appState.isServerRunning ? .green : .secondary)
             
             VStack(alignment: .leading, spacing: 2) {
-                Text("Cymax Phone Out")
+                Text("Cymax Audio")
                     .font(.headline)
-                Text("MVP")
+                Text("Stream to your phone")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -67,78 +64,75 @@ struct MenuBarView: View {
             Spacer()
             
             Circle()
-                .fill(appState.connectionStatus.color)
+                .fill(appState.isServerRunning ? .green : .secondary)
                 .frame(width: 10, height: 10)
         }
     }
     
-    // MARK: - Device Selection
+    // MARK: - Connection View
     
-    @State private var manualIP: String = ""
-    
-    private var deviceSelectionView: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("iPhone Receivers")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            
-            // Manual IP entry
-            HStack {
-                TextField("iPhone IP (e.g. 192.168.1.x)", text: $manualIP)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.caption)
-                Button("Add") {
-                    if !manualIP.isEmpty {
-                        let device = DiscoveredDevice(
-                            id: "manual-\(manualIP)",
-                            name: "iPhone (\(manualIP))",
-                            hostName: manualIP,
-                            port: 19621,
-                            ipAddress: manualIP
+    private var connectionView: some View {
+        VStack(spacing: 16) {
+            if appState.isServerRunning {
+                // QR Code
+                if let qrImage = appState.qrCodeImage {
+                    Image(nsImage: qrImage)
+                        .interpolation(.none)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 160, height: 160)
+                        .background(Color.white)
+                        .cornerRadius(8)
+                } else {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(width: 160, height: 160)
+                        .cornerRadius(8)
+                        .overlay(
+                            Text("No network")
+                                .foregroundStyle(.secondary)
                         )
-                        appState.discoveredDevices.append(device)
-                        appState.log("Added manual device: \(manualIP)")
-                    }
                 }
-                .buttonStyle(.bordered)
-                .font(.caption)
-            }
-            
-            ForEach(appState.discoveredDevices) { device in
-                deviceRow(device)
-            }
-        }
-    }
-    
-    private func deviceRow(_ device: DiscoveredDevice) -> some View {
-        Button(action: { appState.selectDevice(device) }) {
-            HStack {
-                Image(systemName: "iphone")
-                    .foregroundStyle(device == appState.selectedDevice ? .blue : .secondary)
                 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(device.name)
-                        .font(.callout)
-                    if let ip = device.ipAddress {
-                        Text(ip)
-                            .font(.caption2)
+                // URL
+                if let url = appState.webPlayerURL {
+                    VStack(spacing: 4) {
+                        Text("Scan QR or visit:")
+                            .font(.caption)
                             .foregroundStyle(.secondary)
+                        
+                        Text(url)
+                            .font(.system(size: 11, design: .monospaced))
+                            .textSelection(.enabled)
+                        
+                        Button("Copy URL") {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(url, forType: .string)
+                        }
+                        .buttonStyle(.bordered)
+                        .font(.caption)
                     }
                 }
-                
-                Spacer()
-                
-                if device == appState.selectedDevice {
-                    Image(systemName: "checkmark")
-                        .foregroundStyle(.blue)
+            } else {
+                // Instructions when not running
+                VStack(spacing: 8) {
+                    Image(systemName: "qrcode")
+                        .font(.system(size: 48))
+                        .foregroundStyle(.secondary)
+                    
+                    Text("Click Start to begin")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    
+                    Text("No setup needed - just scan the QR code with your phone!")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
                 }
+                .frame(height: 160)
             }
-            .padding(.vertical, 4)
-            .padding(.horizontal, 8)
-            .background(device == appState.selectedDevice ? Color.blue.opacity(0.1) : Color.clear)
-            .cornerRadius(6)
         }
-        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity)
     }
     
     // MARK: - Status
@@ -146,40 +140,72 @@ struct MenuBarView: View {
     private var statusView: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("Status:")
+                Text("Server:")
                     .foregroundStyle(.secondary)
-                Text(appState.connectionStatus.description)
-                    .foregroundStyle(appState.connectionStatus.color)
+                Text(appState.isServerRunning ? "Running" : "Stopped")
+                    .foregroundStyle(appState.isServerRunning ? .green : .secondary)
             }
             .font(.caption)
             
             HStack {
-                Text("Sample Rate:")
+                Text("Audio Capture:")
                     .foregroundStyle(.secondary)
-                Text("\(appState.sampleRate) Hz")
+                Text(appState.captureStatus)
+                    .foregroundStyle(appState.isCaptureActive ? .green : (appState.needsPermission ? .orange : .secondary))
             }
             .font(.caption)
             
-            HStack {
-                Text("Buffer Size:")
-                    .foregroundStyle(.secondary)
-                Text("\(appState.bufferSize) frames")
-            }
-            .font(.caption)
-            
-            HStack {
-                Text("Est. Latency:")
-                    .foregroundStyle(.secondary)
-                Text(String(format: "%.1f ms", appState.estimatedLatencyMs))
-            }
-            .font(.caption)
-            
-            if appState.isStreaming {
-                HStack {
-                    Text("Packet Loss:")
+            // Permission warning banner
+            if appState.needsPermission {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        Text("Screen Recording Permission Required")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                    }
+                    
+                    Text("1. Click 'Open System Settings' below\n2. Find this app and toggle it ON\n3. Come back and click 'Retry'")
+                        .font(.caption2)
                         .foregroundStyle(.secondary)
-                    Text(String(format: "%.2f%%", appState.stats.lossPercentage))
-                        .foregroundStyle(appState.stats.lossPercentage > 1 ? .red : .green)
+                        .fixedSize(horizontal: false, vertical: true)
+                    
+                    HStack(spacing: 8) {
+                        Button(action: { appState.openScreenRecordingSettings() }) {
+                            Label("Open System Settings", systemImage: "gear")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.orange)
+                        
+                        Button(action: { 
+                            appState.needsPermission = false
+                            appState.stopServer()
+                            appState.startServer() 
+                        }) {
+                            Label("Retry", systemImage: "arrow.clockwise")
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+                .padding(8)
+                .background(Color.orange.opacity(0.1))
+                .cornerRadius(8)
+            }
+            
+            HStack {
+                Text("Connected Phones:")
+                    .foregroundStyle(.secondary)
+                Text("\(appState.webClientsConnected)")
+                    .foregroundStyle(appState.webClientsConnected > 0 ? .green : .secondary)
+            }
+            .font(.caption)
+            
+            if appState.isServerRunning && appState.packetsSent > 0 {
+                HStack {
+                    Text("Packets Sent:")
+                        .foregroundStyle(.secondary)
+                    Text("\(appState.packetsSent)")
                 }
                 .font(.caption)
             }
@@ -190,36 +216,20 @@ struct MenuBarView: View {
     
     private var controlsView: some View {
         HStack(spacing: 12) {
-            if appState.connectionStatus == .connected {
-                Button(action: { appState.disconnect() }) {
-                    Label("Disconnect", systemImage: "xmark.circle")
-                }
-                .buttonStyle(.bordered)
-                
-                if appState.isStreaming {
-                    Button(action: { appState.stopStreaming() }) {
-                        Label("Stop", systemImage: "stop.fill")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.red)
-                } else {
-                    Button(action: { appState.startStreaming() }) {
-                        Label("Stream", systemImage: "play.fill")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.green)
-                }
-            } else if appState.connectionStatus == .connecting {
-                ProgressView()
-                    .scaleEffect(0.8)
-                Text("Connecting...")
-                    .font(.caption)
-            } else {
-                Button(action: { appState.connect() }) {
-                    Label("Connect", systemImage: "link")
+            if appState.isServerRunning {
+                Button(action: { appState.stopServer() }) {
+                    Label("Stop", systemImage: "stop.fill")
+                        .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(appState.selectedDevice == nil)
+                .tint(.red)
+            } else {
+                Button(action: { appState.startServer() }) {
+                    Label("Start", systemImage: "play.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.green)
             }
         }
     }
@@ -276,14 +286,6 @@ struct MenuBarView: View {
             Spacer()
             
             Button(action: {
-                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-            }) {
-                Image(systemName: "gear")
-            }
-            .buttonStyle(.borderless)
-            .help("Settings")
-            
-            Button(action: {
                 NSApplication.shared.terminate(nil)
             }) {
                 Image(systemName: "power")
@@ -299,4 +301,3 @@ struct MenuBarView: View {
     MenuBarView()
         .environmentObject(AppState())
 }
-

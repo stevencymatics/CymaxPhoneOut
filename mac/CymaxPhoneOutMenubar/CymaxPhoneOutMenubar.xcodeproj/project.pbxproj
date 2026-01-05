@@ -14,6 +14,12 @@
 		D10000001000000000000005 /* BonjourBrowser.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000001000000000000005 /* BonjourBrowser.swift */; };
 		D10000001000000000000006 /* ControlChannelClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000001000000000000006 /* ControlChannelClient.swift */; };
 		D10000001000000000000007 /* DriverCommunication.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000001000000000000007 /* DriverCommunication.swift */; };
+		D10000001000000000000008 /* UDPAudioReceiver.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000001000000000000008 /* UDPAudioReceiver.swift */; };
+		D10000001000000000000009 /* WebSocketServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000001000000000000009 /* WebSocketServer.swift */; };
+		D10000001000000000000011 /* HTTPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000001000000000000011 /* HTTPServer.swift */; };
+		D10000001000000000000012 /* QRCodeGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000001000000000000012 /* QRCodeGenerator.swift */; };
+		D10000001000000000000013 /* WebPlayerHTML.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000001000000000000013 /* WebPlayerHTML.swift */; };
+		D10000001000000000000014 /* SystemAudioCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000001000000000000014 /* SystemAudioCapture.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -24,7 +30,13 @@
 		D20000001000000000000005 /* BonjourBrowser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BonjourBrowser.swift; sourceTree = "<group>"; };
 		D20000001000000000000006 /* ControlChannelClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlChannelClient.swift; sourceTree = "<group>"; };
 		D20000001000000000000007 /* DriverCommunication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverCommunication.swift; sourceTree = "<group>"; };
+		D20000001000000000000008 /* UDPAudioReceiver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UDPAudioReceiver.swift; sourceTree = "<group>"; };
+		D20000001000000000000009 /* WebSocketServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketServer.swift; sourceTree = "<group>"; };
 		D20000001000000000000010 /* CymaxPhoneOutMenubar.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CymaxPhoneOutMenubar.entitlements; sourceTree = "<group>"; };
+		D20000001000000000000011 /* HTTPServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPServer.swift; sourceTree = "<group>"; };
+		D20000001000000000000012 /* QRCodeGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRCodeGenerator.swift; sourceTree = "<group>"; };
+		D20000001000000000000013 /* WebPlayerHTML.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebPlayerHTML.swift; sourceTree = "<group>"; };
+		D20000001000000000000014 /* SystemAudioCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioCapture.swift; sourceTree = "<group>"; };
 		D20000001000000000000099 /* CymaxPhoneOutMenubar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CymaxPhoneOutMenubar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -57,6 +69,12 @@
 				D20000001000000000000005 /* BonjourBrowser.swift */,
 				D20000001000000000000006 /* ControlChannelClient.swift */,
 				D20000001000000000000007 /* DriverCommunication.swift */,
+				D20000001000000000000008 /* UDPAudioReceiver.swift */,
+				D20000001000000000000009 /* WebSocketServer.swift */,
+				D20000001000000000000011 /* HTTPServer.swift */,
+				D20000001000000000000012 /* QRCodeGenerator.swift */,
+				D20000001000000000000013 /* WebPlayerHTML.swift */,
+				D20000001000000000000014 /* SystemAudioCapture.swift */,
 				D20000001000000000000010 /* CymaxPhoneOutMenubar.entitlements */,
 			);
 			path = CymaxPhoneOutMenubar;
@@ -134,6 +152,12 @@
 				D10000001000000000000005 /* BonjourBrowser.swift in Sources */,
 				D10000001000000000000006 /* ControlChannelClient.swift in Sources */,
 				D10000001000000000000007 /* DriverCommunication.swift in Sources */,
+				D10000001000000000000008 /* UDPAudioReceiver.swift in Sources */,
+				D10000001000000000000009 /* WebSocketServer.swift in Sources */,
+				D10000001000000000000011 /* HTTPServer.swift in Sources */,
+				D10000001000000000000012 /* QRCodeGenerator.swift in Sources */,
+				D10000001000000000000013 /* WebPlayerHTML.swift in Sources */,
+				D10000001000000000000014 /* SystemAudioCapture.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -263,6 +287,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2024 Cymax. All rights reserved.";
+				INFOPLIST_KEY_NSScreenCaptureUsageDescription = "Cymax needs Screen Recording permission to capture system audio and stream it to your phone.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -289,6 +314,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2024 Cymax. All rights reserved.";
+				INFOPLIST_KEY_NSScreenCaptureUsageDescription = "Cymax needs Screen Recording permission to capture system audio and stream it to your phone.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -326,4 +352,3 @@
 	};
 	rootObject = D00000001000000000000001 /* Project object */;
 }
-

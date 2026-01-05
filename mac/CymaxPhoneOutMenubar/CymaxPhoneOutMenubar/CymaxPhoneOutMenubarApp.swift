@@ -2,7 +2,7 @@
 //  CymaxPhoneOutMenubarApp.swift
 //  CymaxPhoneOutMenubar
 //
-//  macOS menubar application for controlling the Cymax Phone Out audio driver
+//  macOS menubar application for streaming system audio to your phone
 //
 
 import SwiftUI
@@ -16,15 +16,9 @@ struct CymaxPhoneOutMenubarApp: App {
             MenuBarView()
                 .environmentObject(appState)
         } label: {
-            Image(systemName: appState.isStreaming ? "antenna.radiowaves.left.and.right" : "antenna.radiowaves.left.and.right.slash")
+            Image(systemName: appState.isServerRunning ? "waveform" : "waveform.slash")
                 .symbolRenderingMode(.hierarchical)
         }
         .menuBarExtraStyle(.window)
-        
-        Settings {
-            SettingsView()
-                .environmentObject(appState)
-        }
     }
 }
-

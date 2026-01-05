@@ -46,7 +46,7 @@ AudioDevice::AudioDevice(AudioObjectID deviceID, AudioObjectID pluginID)
     UDPSenderConfig config;
     config.sampleRate = static_cast<uint32_t>(m_sampleRate);
     config.channels = 2;
-    config.framesPerPacket = 256;
+    config.framesPerPacket = 128;  // MTU-safe: 28 header + 128*2*4 = 1052 bytes
     config.destPort = 19620;
     config.useFloat32 = true;
     
@@ -86,8 +86,9 @@ AudioObjectID AudioDevice::getOutputStreamID() const {
 }
 
 void AudioDevice::setSampleRate(Float64 rate) {
-    if (rate != 44100.0 && rate != 48000.0) {
-        CYMAX_LOG_ERROR("Invalid sample rate: %.0f", rate);
+    // Only 48000Hz is supported - iOS hardware requires it
+    if (rate != 48000.0) {
+        CYMAX_LOG_INFO("Ignoring sample rate %.0f, keeping 48000Hz", rate);
         return;
     }
     
@@ -101,7 +102,7 @@ void AudioDevice::setSampleRate(Float64 rate) {
         UDPSenderConfig config;
         config.sampleRate = static_cast<uint32_t>(rate);
         config.channels = 2;
-        config.framesPerPacket = 256;
+        config.framesPerPacket = 128;  // MTU-safe: 28 header + 128*2*4 = 1052 bytes
         config.destPort = 19620;
         config.useFloat32 = true;
         m_udpSender->updateConfig(config);
@@ -583,13 +584,12 @@ OSStatus AudioDevice::getPropertyData(const AudioObjectPropertyAddress* address,
             return noErr;
         
         case kAudioDevicePropertyAvailableNominalSampleRates: {
-            if (inDataSize < 2 * sizeof(AudioValueRange)) return kAudioHardwareBadPropertySizeError;
+            // Only support 48000Hz - iOS hardware requires it
+            if (inDataSize < sizeof(AudioValueRange)) return kAudioHardwareBadPropertySizeError;
             AudioValueRange* ranges = static_cast<AudioValueRange*>(outData);
-            ranges[0].mMinimum = 44100.0;
-            ranges[0].mMaximum = 44100.0;
-            ranges[1].mMinimum = 48000.0;
-            ranges[1].mMaximum = 48000.0;
-            *outDataSize = 2 * sizeof(AudioValueRange);
+            ranges[0].mMinimum = 48000.0;
+            ranges[0].mMaximum = 48000.0;
+            *outDataSize = sizeof(AudioValueRange);
             return noErr;
         }
         
@@ -680,10 +680,11 @@ OSStatus AudioDevice::setPropertyData(const AudioObjectPropertyAddress* address,
         case kAudioDevicePropertyNominalSampleRate: {
             if (inDataSize < sizeof(Float64)) return kAudioHardwareBadPropertySizeError;
             Float64 rate = *static_cast<const Float64*>(inData);
-            if (rate != 44100.0 && rate != 48000.0) {
-                return kAudioHardwareIllegalOperationError;
+            // Only accept 48000Hz - iOS hardware requires it
+            if (rate != 48000.0) {
+                CYMAX_LOG_INFO("Rejecting sample rate %.0f, forcing 48000Hz", rate);
+                return noErr;  // Silently ignore, keep at 48000Hz
             }
-            // Note: const_cast is needed because we're in a const-ish context
             const_cast<AudioDevice*>(this)->setSampleRate(rate);
             return noErr;
         }

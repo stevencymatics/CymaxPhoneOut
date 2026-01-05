@@ -8,51 +8,17 @@
 import Foundation
 import SwiftUI
 import Combine
+import AppKit
 
-/// Represents a discovered iPhone receiver
+// Legacy types kept for compatibility with unused files
 struct DiscoveredDevice: Identifiable, Hashable {
     let id: String
     let name: String
     let hostName: String
     let port: Int
     let ipAddress: String?
-    
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
-    }
-    
-    static func == (lhs: DiscoveredDevice, rhs: DiscoveredDevice) -> Bool {
-        lhs.id == rhs.id
-    }
 }
 
-/// Connection status
-enum ConnectionStatus: Equatable {
-    case disconnected
-    case connecting
-    case connected
-    case error(String)
-    
-    var description: String {
-        switch self {
-        case .disconnected: return "Disconnected"
-        case .connecting: return "Connecting..."
-        case .connected: return "Connected"
-        case .error(let msg): return "Error: \(msg)"
-        }
-    }
-    
-    var color: Color {
-        switch self {
-        case .disconnected: return .secondary
-        case .connecting: return .orange
-        case .connected: return .green
-        case .error: return .red
-        }
-    }
-}
-
-/// Statistics from the iOS receiver
 struct ReceiverStats {
     var packetsReceived: UInt64 = 0
     var packetsLost: UInt64 = 0
@@ -64,202 +30,258 @@ struct ReceiverStats {
 /// Main application state
 @MainActor
 class AppState: ObservableObject {
-    // Discovery
-    @Published var discoveredDevices: [DiscoveredDevice] = []
-    @Published var selectedDevice: DiscoveredDevice?
     
-    // Connection
-    @Published var connectionStatus: ConnectionStatus = .disconnected
-    @Published var isStreaming: Bool = false
+    // Server state
+    @Published var isServerRunning: Bool = false
+    @Published var webClientsConnected: Int = 0
+    @Published var qrCodeImage: NSImage?
+    @Published var webPlayerURL: String?
     
-    // Audio configuration
-    @Published var sampleRate: UInt32 = 48000
-    @Published var bufferSize: UInt32 = 256
+    // Capture state
+    @Published var isCaptureActive: Bool = false
+    @Published var captureStatus: String = "Ready"
+    @Published var needsPermission: Bool = false
     
-    // Statistics
-    @Published var stats: ReceiverStats = ReceiverStats()
-    @Published var estimatedLatencyMs: Double = 25.0
+    // Stats
+    @Published var packetsSent: Int = 0
     
     // Logging
     @Published var logMessages: [LogMessage] = []
     
     // Services
-    private var bonjourBrowser: BonjourBrowser?
-    private var controlChannel: ControlChannelClient?
-    private var driverCommunication: DriverCommunication?
+    private var audioCapture: SystemAudioCapture?
+    private var webSocketServer: WebSocketServer?
+    private var httpServer: HTTPServer?
+    
+    // Audio packet building
+    private var sequenceNumber: UInt32 = 0
+    
+    // Ports
+    private let httpPort: UInt16 = 8080
+    private let wsPort: UInt16 = 19622
     
     init() {
-        setupServices()
+        log("Cymax Audio started")
+        log("Ready to stream system audio to your phone")
+        updateQRCode()
     }
     
-    private func setupServices() {
-        bonjourBrowser = BonjourBrowser { [weak self] devices in
+    // MARK: - Server Control
+    
+    func startServer() {
+        guard !isServerRunning else { return }
+        
+        log("Starting servers...")
+        
+        // Get local IP
+        guard let localIP = QRCodeGenerator.getLocalIPAddress() else {
+            log("Cannot get local IP address", level: .error)
+            log("Make sure you're connected to WiFi", level: .warning)
+            return
+        }
+        
+        // Start WebSocket server
+        webSocketServer = WebSocketServer(port: wsPort)
+        webSocketServer?.onClientCountChanged = { [weak self] count in
             Task { @MainActor in
-                self?.discoveredDevices = devices
-                self?.log("Found \(devices.count) device(s)")
+                self?.webClientsConnected = count
+                self?.log("Browser clients: \(count)")
+            }
+        }
+        webSocketServer?.start()
+        
+        // Generate HTML with correct IP
+        let htmlContent = getWebPlayerHTML(wsPort: wsPort, hostIP: localIP)
+        
+        // Start HTTP server
+        httpServer = HTTPServer(port: httpPort)
+        httpServer?.htmlContent = htmlContent
+        httpServer?.webSocketPort = wsPort
+        httpServer?.start()
+        
+        isServerRunning = true
+        webPlayerURL = "http://\(localIP):\(httpPort)"
+        
+        // Generate QR code
+        updateQRCode()
+        
+        log("Servers started!")
+        log("URL: \(webPlayerURL ?? "unknown")")
+        
+        // Start audio capture
+        startAudioCapture()
+    }
+    
+    func stopServer() {
+        guard isServerRunning else { return }
+        
+        log("Stopping servers...")
+        
+        // Stop audio capture
+        stopAudioCapture()
+        
+        webSocketServer?.stop()
+        webSocketServer = nil
+        
+        httpServer?.stop()
+        httpServer = nil
+        
+        isServerRunning = false
+        webClientsConnected = 0
+        packetsSent = 0
+        
+        log("Servers stopped")
+    }
+    
+    // MARK: - Audio Capture
+    
+    // #region agent log - debug file logger
+    private func debugLog(_ hypothesisId: String, _ message: String, _ data: [String: Any] = [:]) {
+        let logPath = "/Users/stevencymatics/Documents/Phone Audio Project/.cursor/debug.log"
+        var logData: [String: Any] = [
+            "timestamp": Int(Date().timeIntervalSince1970 * 1000),
+            "location": "AppState.swift",
+            "sessionId": "debug-session",
+            "hypothesisId": hypothesisId,
+            "message": message,
+            "data": data
+        ]
+        if let jsonData = try? JSONSerialization.data(withJSONObject: logData),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            if let handle = FileHandle(forWritingAtPath: logPath) {
+                handle.seekToEndOfFile()
+                handle.write((jsonString + "\n").data(using: .utf8)!)
+                handle.closeFile()
+            } else {
+                FileManager.default.createFile(atPath: logPath, contents: (jsonString + "\n").data(using: .utf8))
+            }
+        }
+    }
+    // #endregion
+    
+    /// Open System Settings to Screen Recording permission pane
+    func openScreenRecordingSettings() {
+        SystemAudioCapture.openSystemSettings()
+        log("Opened System Settings - please grant permission", level: .info)
+    }
+    
+    private func startAudioCapture() {
+        log("Starting system audio capture...")
+        captureStatus = "Starting..."
+        needsPermission = false  // Reset permission flag
+        
+        // #region agent log
+        // Check Info.plist for required keys
+        let screenCaptureDesc = Bundle.main.object(forInfoDictionaryKey: "NSScreenCaptureUsageDescription") as? String
+        let hasPermission = SystemAudioCapture.hasPermission()
+        debugLog("D", "Checking Info.plist keys and permission", [
+            "NSScreenCaptureUsageDescription": screenCaptureDesc ?? "NOT SET",
+            "hasPermission": hasPermission
+        ])
+        // #endregion
+        
+        audioCapture = SystemAudioCapture()
+        
+        audioCapture?.onStatusUpdate = { [weak self] status in
+            Task { @MainActor in
+                self?.captureStatus = status
+                self?.log("Capture: \(status)")
             }
         }
         
-        driverCommunication = DriverCommunication()
-        driverCommunication?.onLog = { [weak self] message in
+        audioCapture?.onError = { [weak self] error in
             Task { @MainActor in
-                self?.log("Driver: \(message)")
+                self?.captureStatus = "Error"
+                self?.log("Capture error: \(error)", level: .error)
             }
         }
         
-        // Add default USB tethering device since Bonjour may not work
-        let usbDevice = DiscoveredDevice(
-            id: "usb-tethering-default",
-            name: "iPhone (USB)",
-            hostName: "172.20.10.1",
-            port: 19621,
-            ipAddress: "172.20.10.1"
-        )
-        discoveredDevices = [usbDevice]
+        audioCapture?.onAudioSamples = { [weak self] samples, sampleRate, channels in
+            guard let self = self else { return }
+            // Process audio in background to avoid main thread congestion
+            self.processAudioInBackground(samples, sampleRate: sampleRate, channels: channels)
+        }
         
-        log("Cymax Phone Out Menubar started")
-        log("Default USB device: 172.20.10.1:19621")
-        
-        // Check network status
-        checkNetworkStatus()
-    }
-    
-    func checkNetworkStatus() {
-        // Run network diagnostics
         Task {
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/sbin/ping")
-            process.arguments = ["-c", "1", "-t", "1", "172.20.10.1"]
-            
-            let pipe = Pipe()
-            process.standardOutput = pipe
-            process.standardError = pipe
-            
             do {
-                try process.run()
-                process.waitUntilExit()
+                // #region agent log
+                debugLog("E", "About to call audioCapture.start()", [:])
+                // #endregion
                 
+                try await audioCapture?.start()
                 await MainActor.run {
-                    if process.terminationStatus == 0 {
-                        log("✓ iPhone reachable at 172.20.10.1", level: .info)
+                    // #region agent log
+                    self.debugLog("E", "audioCapture.start() SUCCEEDED", [:])
+                    // #endregion
+                    self.isCaptureActive = true
+                    self.captureStatus = "Capturing"
+                }
+            } catch {
+                await MainActor.run {
+                    // #region agent log
+                    let nsError = error as NSError
+                    self.debugLog("A,B,C,D,E", "audioCapture.start() FAILED in AppState", [
+                        "errorDomain": nsError.domain,
+                        "errorCode": nsError.code,
+                        "errorDescription": error.localizedDescription,
+                        "errorFull": String(describing: error)
+                    ])
+                    // #endregion
+                    
+                    // Check if it's a permission issue
+                    if let captureError = error as? CaptureError, captureError == .notAuthorized {
+                        self.needsPermission = true
+                        self.captureStatus = "Permission Required"
+                        self.log("Screen Recording permission required", level: .warning)
+                        self.log("Click 'Open Settings' below to grant permission", level: .info)
                     } else {
-                        log("✗ Cannot reach 172.20.10.1 - Check USB tethering", level: .warning)
-                        log("Tip: Settings > Personal Hotspot must be ON", level: .info)
+                        self.log("Failed to start capture: \(error.localizedDescription)", level: .error)
+                        self.captureStatus = "Failed"
                     }
                 }
-            } catch {
-                await MainActor.run {
-                    log("Network check failed: \(error.localizedDescription)", level: .error)
-                }
             }
         }
     }
     
-    // MARK: - Actions
-    
-    func startBrowsing() {
-        bonjourBrowser?.startBrowsing()
-        log("Started browsing for receivers")
+    private func stopAudioCapture() {
+        audioCapture?.stop()
+        audioCapture = nil
+        isCaptureActive = false
+        captureStatus = "Stopped"
     }
     
-    func stopBrowsing() {
-        bonjourBrowser?.stopBrowsing()
-    }
-    
-    func selectDevice(_ device: DiscoveredDevice) {
-        selectedDevice = device
-        log("Selected device: \(device.name)")
-    }
-    
-    func connect() {
-        guard let device = selectedDevice else {
-            log("No device selected", level: .error)
-            return
-        }
+    /// Process audio in background to avoid main thread congestion
+    private func processAudioInBackground(_ samples: [Float], sampleRate: Int, channels: Int) {
+        // Capture what we need
+        let server = webSocketServer
+        let clientCount = webClientsConnected
         
-        guard let ipAddress = device.ipAddress else {
-            log("No IP address for device", level: .error)
-            return
-        }
+        guard clientCount > 0 else { return }
+        guard samples.count > 0 else { return }
+        guard channels > 0 else { return }
         
-        connectionStatus = .connecting
-        log("Connecting to \(device.name) at \(ipAddress)...")
-        
-        // Set destination IP in driver
-        driverCommunication?.setDestinationIP(ipAddress)
-        
-        // Connect control channel
-        controlChannel = ControlChannelClient(
-            host: ipAddress,
-            port: 19621,
-            onStats: { [weak self] stats in
-                Task { @MainActor in
-                    self?.updateStats(stats)
-                }
-            },
-            onDisconnect: { [weak self] reason in
-                Task { @MainActor in
-                    self?.handleDisconnect(reason: reason)
-                }
-            }
-        )
-        
-        Task {
-            do {
-                try await controlChannel?.connect()
-                try await controlChannel?.sendHello(
-                    deviceName: Host.current().localizedName ?? "Mac",
-                    sampleRate: sampleRate,
-                    channels: 2
-                )
-                connectionStatus = .connected
-                log("Connected to \(device.name)")
-            } catch {
-                connectionStatus = .error(error.localizedDescription)
-                log("Connection failed: \(error.localizedDescription)", level: .error)
+        // Use global function to completely avoid Swift actor issues
+        processAudioGlobally(samples: samples, sampleRate: sampleRate, channels: channels, server: server) { [weak self] count in
+            Task { @MainActor in
+                self?.packetsSent = count
             }
         }
     }
     
-    func disconnect() {
-        controlChannel?.disconnect()
-        controlChannel = nil
-        driverCommunication?.clearDestinationIP()
-        connectionStatus = .disconnected
-        isStreaming = false
-        log("Disconnected")
-    }
+    // MARK: - QR Code
     
-    func startStreaming() {
-        guard connectionStatus == .connected else {
-            log("Cannot stream: not connected", level: .error)
+    private func updateQRCode() {
+        guard let url = QRCodeGenerator.getWebPlayerURL(httpPort: httpPort) else {
+            qrCodeImage = nil
+            webPlayerURL = nil
             return
         }
         
-        isStreaming = true
-        log("Streaming started")
+        webPlayerURL = url
+        qrCodeImage = QRCodeGenerator.generate(url: url, size: 200)
     }
     
-    func stopStreaming() {
-        isStreaming = false
-        log("Streaming stopped")
-    }
-    
-    // MARK: - Private
-    
-    private func updateStats(_ stats: ReceiverStats) {
-        self.stats = stats
-        
-        // Calculate estimated latency
-        let bufferLatency = Double(bufferSize) / Double(sampleRate) * 1000.0
-        estimatedLatencyMs = bufferLatency + stats.bufferLevelMs + 2.0  // +2ms for network
-    }
-    
-    private func handleDisconnect(reason: String) {
-        connectionStatus = .disconnected
-        isStreaming = false
-        log("Disconnected: \(reason)", level: .warning)
-    }
+    // MARK: - Logging
     
     func log(_ message: String, level: LogLevel = .info) {
         let logMessage = LogMessage(timestamp: Date(), level: level, message: message)
@@ -269,6 +291,8 @@ class AppState: ObservableObject {
         if logMessages.count > 100 {
             logMessages.removeFirst(logMessages.count - 100)
         }
+        
+        print("[\(level.rawValue)] \(message)")
     }
 }
 
@@ -303,3 +327,130 @@ struct LogMessage: Identifiable {
     }
 }
 
+// MARK: - Audio Processor (Thread-safe using OSAtomic-style counters)
+
+/// Global audio processing state - avoids Swift concurrency issues
+private var gAudioSequence: UInt32 = 0
+private var gAudioPacketsSent: Int = 0
+private var gTotalFramesSent: Int = 0
+private var gStartTime: CFAbsoluteTime = 0
+private let gAudioQueue = DispatchQueue(label: "com.cymax.audioprocessing", qos: .userInteractive)
+
+/// Processes audio on a background queue - completely avoids Swift actor system
+func processAudioGlobally(samples: [Float], sampleRate: Int, channels: Int, server: WebSocketServer?, onPacketCount: @escaping @Sendable (Int) -> Void) {
+    // Capture everything we need as values
+    let samplesCopy = samples
+    let sr = sampleRate
+    let ch = channels
+    
+    gAudioQueue.async {
+        // #region agent log - H5 track timing
+        if gStartTime == 0 {
+            gStartTime = CFAbsoluteTimeGetCurrent()
+        }
+        // #endregion
+        
+        let framesPerPacket = 128
+        let samplesPerPacket = framesPerPacket * ch
+        
+        var offset = 0
+        var packetCount = 0
+        var framesThisBatch = 0
+        
+        while offset < samplesCopy.count {
+            let end = min(offset + samplesPerPacket, samplesCopy.count)
+            guard end > offset else { break }
+            
+            let chunkSamples = Array(samplesCopy[offset..<end])
+            guard chunkSamples.count > 0 else { break }
+            
+            let frameCount = chunkSamples.count / ch
+            guard frameCount > 0 else { break }
+            
+            // Create audio data from samples
+            var audioData: Data?
+            chunkSamples.withUnsafeBufferPointer { buffer in
+                if let baseAddress = buffer.baseAddress {
+                    audioData = Data(bytes: baseAddress, count: buffer.count * MemoryLayout<Float>.size)
+                }
+            }
+            
+            guard let data = audioData else {
+                offset = end
+                continue
+            }
+            
+            // Create and send packet using global counters
+            let seq = gAudioSequence
+            gAudioSequence &+= 1
+            
+            // Build packet values safely
+            let ts = UInt32(truncatingIfNeeded: Int64(Date().timeIntervalSince1970 * 1000))
+            
+            let audioPacket = AudioPacket(
+                sequence: seq,
+                timestamp: ts,
+                sampleRate: UInt32(sr),
+                channels: UInt16(ch),
+                frameCount: UInt16(frameCount),
+                audioData: data
+            )
+            
+            // Broadcast on the WebSocket's own queue to avoid thread issues
+            server?.broadcast(audioPacket)
+            
+            gAudioPacketsSent += 1
+            gTotalFramesSent += frameCount
+            framesThisBatch += frameCount
+            packetCount += 1
+            
+            offset = end
+        }
+        
+        // #region agent log - H5 rate measurement
+        if gAudioPacketsSent % 500 == 0 {
+            let elapsed = CFAbsoluteTimeGetCurrent() - gStartTime
+            let expectedFrames = Int(elapsed * Double(sr))
+            let drift = gTotalFramesSent - expectedFrames
+            let effectiveRate = elapsed > 0 ? Double(gTotalFramesSent) / elapsed : 0
+            
+            let logPath = "/Users/stevencymatics/Documents/Phone Audio Project/.cursor/debug.log"
+            let logData: [String: Any] = [
+                "timestamp": Int(Date().timeIntervalSince1970 * 1000),
+                "location": "AppState.processAudioGlobally",
+                "sessionId": "debug-session",
+                "hypothesisId": "H5",
+                "message": "RATE_CHECK",
+                "data": [
+                    "elapsedSec": elapsed,
+                    "totalFramesSent": gTotalFramesSent,
+                    "expectedFrames": expectedFrames,
+                    "drift": drift,
+                    "driftPercent": expectedFrames > 0 ? Double(drift) / Double(expectedFrames) * 100 : 0,
+                    "effectiveRate": effectiveRate,
+                    "targetRate": sr,
+                    "packetsTotal": gAudioPacketsSent
+                ]
+            ]
+            if let jsonData = try? JSONSerialization.data(withJSONObject: logData),
+               let jsonString = String(data: jsonData, encoding: .utf8) {
+                if let handle = FileHandle(forWritingAtPath: logPath) {
+                    handle.seekToEndOfFile()
+                    handle.write((jsonString + "\n").data(using: .utf8)!)
+                    handle.closeFile()
+                } else if FileManager.default.createFile(atPath: logPath, contents: (jsonString + "\n").data(using: .utf8)) {
+                    // File created
+                }
+            }
+        }
+        // #endregion
+        
+        // Update UI periodically
+        if packetCount > 0 && gAudioPacketsSent % 10 == 0 {
+            let count = gAudioPacketsSent
+            DispatchQueue.main.async {
+                onPacketCount(count)
+            }
+        }
+    }
+}

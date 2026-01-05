@@ -1,0 +1,357 @@
+//
+//  SystemAudioCapture.swift
+//  CymaxPhoneOutMenubar
+//
+//  Captures system audio using ScreenCaptureKit
+//  No need to change audio output device!
+//
+
+import Foundation
+import ScreenCaptureKit
+import AVFoundation
+import CoreMedia
+import CoreGraphics
+
+/// Captures system audio using ScreenCaptureKit
+@available(macOS 13.0, *)
+class SystemAudioCapture: NSObject, SCStreamDelegate, SCStreamOutput {
+    
+    private var stream: SCStream?
+    private var isCapturing = false
+    private var hasCheckedPermission = false
+    
+    /// Callback for captured audio samples
+    var onAudioSamples: (([Float], Int, Int) -> Void)?  // samples, sampleRate, channels
+    
+    /// Callback for errors
+    var onError: ((String) -> Void)?
+    
+    /// Callback for status updates
+    var onStatusUpdate: ((String) -> Void)?
+    
+    // Audio format
+    private let sampleRate: Int = 48000
+    private let channels: Int = 2
+    
+    // Packet sequencing
+    private var sequenceNumber: UInt32 = 0
+    
+    override init() {
+        super.init()
+    }
+    
+    deinit {
+        stop()
+    }
+    
+    /// Check if Screen Recording permission is granted (without prompting)
+    static func hasPermission() -> Bool {
+        return CGPreflightScreenCaptureAccess()
+    }
+    
+    /// Request Screen Recording permission (will prompt user)
+    static func requestPermission() -> Bool {
+        return CGRequestScreenCaptureAccess()
+    }
+    
+    /// Open System Settings to Screen Recording pane
+    static func openSystemSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+    
+    // #region agent log - debug file logger
+    private func debugLog(_ hypothesisId: String, _ message: String, _ data: [String: Any] = [:]) {
+        let logPath = "/Users/stevencymatics/Documents/Phone Audio Project/.cursor/debug.log"
+        let logData: [String: Any] = [
+            "timestamp": Int(Date().timeIntervalSince1970 * 1000),
+            "location": "SystemAudioCapture.swift",
+            "sessionId": "debug-session",
+            "hypothesisId": hypothesisId,
+            "message": message,
+            "data": data
+        ]
+        if let jsonData = try? JSONSerialization.data(withJSONObject: logData),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            if let handle = FileHandle(forWritingAtPath: logPath) {
+                handle.seekToEndOfFile()
+                handle.write((jsonString + "\n").data(using: .utf8)!)
+                handle.closeFile()
+            } else {
+                FileManager.default.createFile(atPath: logPath, contents: (jsonString + "\n").data(using: .utf8))
+            }
+        }
+    }
+    // #endregion
+    
+    /// Start capturing system audio
+    func start() async throws {
+        guard !isCapturing else { return }
+        
+        // #region agent log
+        let bundleId = Bundle.main.bundleIdentifier ?? "unknown"
+        let execPath = Bundle.main.executablePath ?? "unknown"
+        let hasPermission = SystemAudioCapture.hasPermission()
+        debugLog("A,D", "start() called - checking app identity and permission", [
+            "bundleIdentifier": bundleId,
+            "executablePath": execPath,
+            "hasPermission": hasPermission
+        ])
+        // #endregion
+        
+        // Check permission WITHOUT prompting - never call CGRequestScreenCaptureAccess
+        // This avoids the system dialog that restarts the app
+        if !SystemAudioCapture.hasPermission() {
+            // #region agent log
+            debugLog("B", "Permission NOT granted - user must grant manually", [:])
+            // #endregion
+            throw CaptureError.notAuthorized
+        }
+        
+        onStatusUpdate?("Setting up audio capture...")
+        
+        // #region agent log
+        debugLog("E", "About to call SCShareableContent.excludingDesktopWindows", [:])
+        // #endregion
+        
+        // Get available content
+        let availableContent: SCShareableContent
+        do {
+            availableContent = try await SCShareableContent.excludingDesktopWindows(
+                false,
+                onScreenWindowsOnly: false
+            )
+            // #region agent log
+            debugLog("E", "SCShareableContent succeeded", [
+                "displayCount": availableContent.displays.count,
+                "windowCount": availableContent.windows.count
+            ])
+            // #endregion
+        } catch {
+            // #region agent log
+            let nsError = error as NSError
+            debugLog("A,B,C,E", "SCShareableContent FAILED", [
+                "errorDomain": nsError.domain,
+                "errorCode": nsError.code,
+                "errorDescription": error.localizedDescription,
+                "errorDebugDesc": String(describing: error)
+            ])
+            // #endregion
+            throw error
+        }
+        
+        // We need at least one display to create a stream
+        guard let display = availableContent.displays.first else {
+            throw CaptureError.noDisplay
+        }
+        
+        onStatusUpdate?("Setting up audio capture...")
+        
+        // Create filter - we want system audio, not specific windows
+        let filter = SCContentFilter(display: display, excludingWindows: [])
+        
+        // Configure stream - audio only (we'll ignore video)
+        let config = SCStreamConfiguration()
+        config.capturesAudio = true
+        config.excludesCurrentProcessAudio = true  // Don't capture our own audio
+        config.sampleRate = sampleRate
+        config.channelCount = channels
+        
+        // Minimal video settings (required but we'll ignore it)
+        config.width = 2
+        config.height = 2
+        config.minimumFrameInterval = CMTime(value: 1, timescale: 1)  // 1 FPS minimum
+        config.showsCursor = false
+        
+        // Create stream
+        stream = SCStream(filter: filter, configuration: config, delegate: self)
+        
+        // Add audio output
+        try stream?.addStreamOutput(self, type: .audio, sampleHandlerQueue: DispatchQueue(label: "com.cymax.audiocapture"))
+        
+        onStatusUpdate?("Starting audio capture...")
+        
+        // Start capture
+        try await stream?.startCapture()
+        
+        isCapturing = true
+        onStatusUpdate?("Capturing system audio")
+        print("SystemAudioCapture: Started capturing system audio")
+    }
+    
+    /// Stop capturing
+    func stop() {
+        guard isCapturing else { return }
+        
+        Task {
+            try? await stream?.stopCapture()
+            stream = nil
+            isCapturing = false
+            sequenceNumber = 0
+            print("SystemAudioCapture: Stopped")
+        }
+    }
+    
+    // MARK: - SCStreamOutput
+    
+    // Track actual sample rate from audio buffers
+    private var detectedSampleRate: Int = 48000
+    private var hasLoggedFormat = false
+    private var bufferCount = 0
+    private var totalSamplesReceived = 0
+    private var captureStartTime: CFAbsoluteTime = 0
+    
+    func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
+        // Only process audio
+        guard type == .audio else { return }
+        
+        bufferCount += 1
+        
+        // #region agent log - H5/H6 timing
+        if captureStartTime == 0 {
+            captureStartTime = CFAbsoluteTimeGetCurrent()
+        }
+        // #endregion
+        
+        // Get the ACTUAL sample rate from the format description
+        if let formatDescription = CMSampleBufferGetFormatDescription(sampleBuffer),
+           let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(formatDescription)?.pointee {
+            let actualRate = Int(asbd.mSampleRate)
+            let actualChannels = Int(asbd.mChannelsPerFrame)
+            
+            // #region agent log - H1/H2/H12 detailed format detection
+            if !hasLoggedFormat || (bufferCount % 500 == 0) {
+                let formatFlags = asbd.mFormatFlags
+                let isFloat = (formatFlags & kAudioFormatFlagIsFloat) != 0
+                let isInterleaved = (formatFlags & kAudioFormatFlagIsNonInterleaved) == 0
+                let isPacked = (formatFlags & kAudioFormatFlagIsPacked) != 0
+                let bitsPerChannel = asbd.mBitsPerChannel
+                let bytesPerFrame = asbd.mBytesPerFrame
+                let bytesPerPacket = asbd.mBytesPerPacket
+                let framesPerPacket = asbd.mFramesPerPacket
+                
+                debugLog("H12", "SCK_AUDIO_FORMAT", [
+                    "actualRate": actualRate,
+                    "actualChannels": actualChannels,
+                    "isFloat": isFloat,
+                    "isInterleaved": isInterleaved,
+                    "isPacked": isPacked,
+                    "bitsPerChannel": bitsPerChannel,
+                    "bytesPerFrame": bytesPerFrame,
+                    "bytesPerPacket": bytesPerPacket,
+                    "framesPerPacket": framesPerPacket,
+                    "formatFlags": formatFlags,
+                    "bufferCount": bufferCount
+                ])
+            }
+            // #endregion
+            
+            // Log format once
+            if !hasLoggedFormat {
+                hasLoggedFormat = true
+                print("SystemAudioCapture: Actual format - rate=\(actualRate)Hz, channels=\(actualChannels)")
+                if actualRate != sampleRate {
+                    print("SystemAudioCapture: ⚠️ Sample rate mismatch! Requested \(sampleRate)Hz but got \(actualRate)Hz")
+                }
+            }
+            
+            detectedSampleRate = actualRate
+        }
+        
+        // Get audio buffer
+        guard let audioBuffer = sampleBuffer.dataBuffer else { return }
+        
+        // Get the audio data
+        var length = 0
+        var dataPointer: UnsafeMutablePointer<Int8>?
+        
+        let status = CMBlockBufferGetDataPointer(
+            audioBuffer,
+            atOffset: 0,
+            lengthAtOffsetOut: nil,
+            totalLengthOut: &length,
+            dataPointerOut: &dataPointer
+        )
+        
+        guard status == kCMBlockBufferNoErr, let dataPointer = dataPointer, length > 0 else {
+            return
+        }
+        
+        // Convert to Float32 samples
+        // ScreenCaptureKit outputs Float32 NON-INTERLEAVED (all L samples, then all R samples)
+        let floatPointer = UnsafeRawPointer(dataPointer).assumingMemoryBound(to: Float.self)
+        let sampleCount = length / MemoryLayout<Float>.size
+        let frameCount = sampleCount / channels  // frames = total samples / channels
+        
+        totalSamplesReceived += sampleCount
+        
+        // #region agent log - H3/H5/H6 buffer and rate check
+        if bufferCount <= 5 || bufferCount % 500 == 0 {
+            let maxSample = (0..<min(sampleCount, 100)).map { abs(floatPointer[$0]) }.max() ?? 0
+            let elapsed = CFAbsoluteTimeGetCurrent() - captureStartTime
+            let framesReceived = totalSamplesReceived / channels
+            let expectedFrames = Int(elapsed * Double(detectedSampleRate))
+            let drift = framesReceived - expectedFrames
+            let effectiveRate = elapsed > 0 ? Double(framesReceived) / elapsed : 0
+            
+            debugLog("H5", "SCK_RATE", [
+                "bufferCount": bufferCount,
+                "sampleCount": sampleCount,
+                "frames": frameCount,
+                "totalFramesReceived": framesReceived,
+                "elapsedSec": elapsed,
+                "expectedFrames": expectedFrames,
+                "drift": drift,
+                "driftPercent": expectedFrames > 0 ? Double(drift) / Double(expectedFrames) * 100 : 0,
+                "effectiveRate": effectiveRate,
+                "detectedRate": detectedSampleRate,
+                "maxSample": maxSample
+            ])
+        }
+        // #endregion
+        
+        // Convert from NON-INTERLEAVED to INTERLEAVED format
+        // Input:  [L0, L1, L2, ..., L(n-1), R0, R1, R2, ..., R(n-1)]
+        // Output: [L0, R0, L1, R1, L2, R2, ..., L(n-1), R(n-1)]
+        var interleavedSamples = [Float](repeating: 0, count: sampleCount)
+        for frame in 0..<frameCount {
+            let leftSample = floatPointer[frame]                    // Left channel: first half
+            let rightSample = floatPointer[frameCount + frame]      // Right channel: second half
+            interleavedSamples[frame * 2] = leftSample
+            interleavedSamples[frame * 2 + 1] = rightSample
+        }
+        
+        // Call the handler with INTERLEAVED samples and the ACTUAL detected sample rate
+        onAudioSamples?(interleavedSamples, detectedSampleRate, channels)
+    }
+    
+    // MARK: - SCStreamDelegate
+    
+    func stream(_ stream: SCStream, didStopWithError error: Error) {
+        print("SystemAudioCapture: Stream stopped with error: \(error)")
+        isCapturing = false
+        onError?("Capture stopped: \(error.localizedDescription)")
+    }
+}
+
+// MARK: - Errors
+
+enum CaptureError: Error, LocalizedError {
+    case noDisplay
+    case notAuthorized
+    case captureFailedToStart
+    
+    var errorDescription: String? {
+        switch self {
+        case .noDisplay:
+            return "No display found"
+        case .notAuthorized:
+            return "Screen recording permission not granted"
+        case .captureFailedToStart:
+            return "Failed to start capture"
+        }
+    }
+}
+
+

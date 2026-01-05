@@ -40,8 +40,8 @@ struct UDPSenderConfig {
     /// Number of channels
     uint16_t channels = 2;
     
-    /// Frames per UDP packet
-    uint16_t framesPerPacket = 256;
+    /// Frames per UDP packet (128 fits under MTU: 28 header + 128*2*4 = 1052 bytes)
+    uint16_t framesPerPacket = 128;
     
     /// Target destination port
     uint16_t destPort = 19620;
@@ -99,6 +99,12 @@ public:
     /// Get frames dropped count (due to falling behind)
     uint64_t framesDropped() const { return m_framesDropped.load(std::memory_order_relaxed); }
     
+    /// Get ring buffer high water mark (peak fill level in frames)
+    size_t ringBufferHighWater() const;
+    
+    /// Reset ring buffer high water mark
+    void resetRingBufferHighWater();
+    
     /// Update configuration (call when not running)
     void updateConfig(const UDPSenderConfig& config);
     
@@ -141,7 +147,10 @@ private:
     std::atomic<uint64_t> m_framesDropped{0};
     
     // Preallocated packet buffer (no allocation in hot path)
-    static constexpr size_t kMaxPacketSize = 2048;
+    // Size = 28 byte header + max audio payload
+    // For 128 frames stereo float32: 28 + 128*2*4 = 1052 bytes
+    // Keep at 1500 to match MTU and allow some headroom
+    static constexpr size_t kMaxPacketSize = 1500;
     uint8_t m_packetBuffer[kMaxPacketSize];
 };
 
