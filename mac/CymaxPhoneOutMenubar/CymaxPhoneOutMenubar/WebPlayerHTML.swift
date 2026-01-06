@@ -269,9 +269,9 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         let readPos = 0;
         let bufferedSamples = 0;
         
-        // Target buffer level (samples) - increased for stability
-        const TARGET_BUFFER_MS = 300;
-        const PREBUFFER_MS = 200;  // Wait for this much audio before starting playback
+        // Target buffer level (samples) - optimized for low latency
+        const TARGET_BUFFER_MS = 120;  // Aggressive: was 300ms
+        const PREBUFFER_MS = 80;       // Aggressive: was 200ms
         let targetBufferSamples = 48000 * 2 * (TARGET_BUFFER_MS / 1000);
         let prebufferSamples = 48000 * 2 * (PREBUFFER_MS / 1000);
         let isPrebuffering = true;
@@ -343,8 +343,8 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
                 debugLog('AudioContext created, state: ' + audioContext.state);
                 debugLog('Output rate: ' + outputRate + 'Hz (waiting for source rate from packet)');
                 
-                // Resize buffer for output rate (3 seconds for safety)
-                BUFFER_SIZE = Math.ceil(outputRate * 6); // 3 seconds stereo at output rate
+                // Resize buffer for output rate (1 second is enough with low latency settings)
+                BUFFER_SIZE = Math.ceil(outputRate * 2); // 1 second stereo at output rate
                 audioBuffer = new Float32Array(BUFFER_SIZE);
                 targetBufferSamples = Math.ceil(outputRate * 2 * (TARGET_BUFFER_MS / 1000));
                 
@@ -364,11 +364,11 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
                 gainNode.connect(audioContext.destination);
                 debugLog('Gain node created and connected');
                 
-                // Create script processor for audio output
-                const scriptNode = audioContext.createScriptProcessor(2048, 0, 2);
+                // Create script processor for audio output (smaller buffer = lower latency)
+                const scriptNode = audioContext.createScriptProcessor(1024, 0, 2);
                 scriptNode.onaudioprocess = processAudio;
                 scriptNode.connect(gainNode);
-                debugLog('Script processor created (buffer: 2048 frames)');
+                debugLog('Script processor created (buffer: 1024 frames, ~21ms)');
                 
                 // Connect WebSocket
                 connectWebSocket();
