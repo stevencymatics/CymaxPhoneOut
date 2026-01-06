@@ -52,8 +52,8 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         }
         
         .subtitle {
-            color: #f5a623;
-            margin-bottom: 30px;
+            color: #888;
+            margin-bottom: 20px;
             font-size: 0.9rem;
         }
         
@@ -64,7 +64,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
             border: none;
             background: #f5a623;
             cursor: pointer;
-            margin: 0 auto 30px;
+            margin: 0 auto 15px;
             transition: all 0.2s;
             display: flex;
             align-items: center;
@@ -107,7 +107,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         .visualizer-container {
             width: 100%;
             height: 120px;
-            margin: 20px 0;
+            margin: 10px 0 20px 0;
             display: flex;
             align-items: flex-end;
             justify-content: center;
@@ -229,7 +229,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
 </head>
 <body>
     <div class="container">
-        <h1>Cymax Audio</h1>
+        <h1>Cymatics <span style="color: #f5a623;">Link</span></h1>
         <p class="subtitle">Stream audio from your Mac</p>
         
         <button class="play-button" id="playBtn" onclick="togglePlay()">
