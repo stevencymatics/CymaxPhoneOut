@@ -27,7 +27,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            background: #000;
             min-height: 100vh;
             display: flex;
             flex-direction: column;
@@ -47,34 +47,30 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
             font-size: 1.8rem;
             margin-bottom: 8px;
             font-weight: 600;
+            color: #fff;
         }
         
         .subtitle {
-            color: #a0a0a0;
-            margin-bottom: 40px;
+            color: #f5a623;
+            margin-bottom: 30px;
             font-size: 0.9rem;
         }
         
         .play-button {
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            border: none;
-            background: linear-gradient(145deg, #e94560, #c73e54);
-            color: white;
-            font-size: 3rem;
+            padding: 16px 48px;
+            border-radius: 8px;
+            border: 2px solid #22c55e;
+            background: transparent;
+            color: #22c55e;
+            font-size: 1.2rem;
+            font-weight: 600;
             cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             margin: 0 auto 30px;
-            box-shadow: 0 10px 40px rgba(233, 69, 96, 0.4);
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: all 0.2s;
         }
         
         .play-button:hover {
-            transform: scale(1.05);
-            box-shadow: 0 15px 50px rgba(233, 69, 96, 0.5);
+            background: rgba(34, 197, 94, 0.1);
         }
         
         .play-button:active {
@@ -82,12 +78,53 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         }
         
         .play-button.playing {
-            background: linear-gradient(145deg, #4ade80, #22c55e);
-            box-shadow: 0 10px 40px rgba(74, 222, 128, 0.4);
+            background: #22c55e;
+            color: #000;
         }
         
-        .play-button.playing:hover {
-            box-shadow: 0 15px 50px rgba(74, 222, 128, 0.5);
+        /* Visualizer */
+        .visualizer-container {
+            width: 100%;
+            height: 120px;
+            margin: 20px 0;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 4px;
+        }
+        
+        .viz-bar {
+            width: 8px;
+            min-height: 4px;
+            background: linear-gradient(to top, #22c55e, #4ade80);
+            border-radius: 2px;
+            transition: height 0.05s ease-out;
+        }
+        
+        /* Stop button */
+        .stop-button {
+            padding: 16px 48px;
+            border-radius: 8px;
+            border: none;
+            background: rgba(248, 113, 113, 0.8);
+            color: #fff;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 20px auto;
+            transition: all 0.2s;
+        }
+        
+        .stop-button:hover {
+            background: rgba(248, 113, 113, 1);
+        }
+        
+        .stop-button:active {
+            transform: scale(0.98);
+        }
+        
+        .hidden {
+            display: none !important;
         }
         
         .status {
@@ -95,7 +132,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
             align-items: center;
             justify-content: center;
             gap: 8px;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
         }
         
         .status-dot {
@@ -129,43 +166,10 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
             font-size: 0.85rem;
         }
         
-        .volume-container {
-            margin-top: 20px;
-        }
-        
-        .volume-label {
-            color: #a0a0a0;
-            font-size: 0.8rem;
-            margin-bottom: 8px;
-        }
-        
-        .volume-slider {
-            width: 80%;
-            max-width: 250px;
-            height: 6px;
-            -webkit-appearance: none;
-            background: rgba(255,255,255,0.2);
-            border-radius: 3px;
-            outline: none;
-        }
-        
-        .volume-slider::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background: #e94560;
-            cursor: pointer;
-        }
-        
         .stats {
             margin-top: 20px;
-            font-size: 0.75rem;
-            color: #888;
-        }
-        
-        .stats div {
-            margin: 4px 0;
+            font-size: 0.8rem;
+            color: #666;
         }
         
         .error-message {
@@ -174,17 +178,33 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
             font-size: 0.85rem;
         }
         
+        .debug-section {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #222;
+        }
+        
+        .debug-toggle {
+            background: none;
+            border: 1px solid #333;
+            color: #666;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            cursor: pointer;
+        }
+        
         .debug-log {
-            margin-top: 30px;
+            margin-top: 15px;
             background: rgba(0,0,0,0.4);
             border-radius: 8px;
             padding: 12px;
             text-align: left;
-            max-height: 200px;
+            max-height: 150px;
             overflow-y: auto;
             font-family: monospace;
-            font-size: 0.7rem;
-            color: #888;
+            font-size: 0.65rem;
+            color: #666;
         }
         
         .debug-log .log-entry {
@@ -198,52 +218,67 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         
         .copy-btn {
             margin-top: 10px;
-            padding: 8px 16px;
-            background: rgba(255,255,255,0.1);
-            border: 1px solid rgba(255,255,255,0.2);
-            border-radius: 6px;
-            color: #fff;
-            font-size: 0.75rem;
+            padding: 6px 12px;
+            background: transparent;
+            border: 1px solid #333;
+            border-radius: 4px;
+            color: #666;
+            font-size: 0.7rem;
             cursor: pointer;
-        }
-        
-        .copy-btn:active {
-            background: rgba(255,255,255,0.2);
         }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Cymax Audio</h1>
-        <p class="subtitle">Stream audio from your Mac</p>
+        <p class="subtitle">Disable Silent Mode for sound to play</p>
         
         <button class="play-button" id="playBtn" onclick="togglePlay()">
-            ▶
+            Play
         </button>
         
-        <div class="status">
-            <div class="status-dot" id="statusDot"></div>
-            <span class="status-text" id="statusText">Tap to start</span>
+        <!-- Visualizer bars -->
+        <div class="visualizer-container" id="visualizer">
+            <div class="viz-bar" id="bar0"></div>
+            <div class="viz-bar" id="bar1"></div>
+            <div class="viz-bar" id="bar2"></div>
+            <div class="viz-bar" id="bar3"></div>
+            <div class="viz-bar" id="bar4"></div>
+            <div class="viz-bar" id="bar5"></div>
+            <div class="viz-bar" id="bar6"></div>
+            <div class="viz-bar" id="bar7"></div>
+            <div class="viz-bar" id="bar8"></div>
+            <div class="viz-bar" id="bar9"></div>
+            <div class="viz-bar" id="bar10"></div>
+            <div class="viz-bar" id="bar11"></div>
+            <div class="viz-bar" id="bar12"></div>
+            <div class="viz-bar" id="bar13"></div>
+            <div class="viz-bar" id="bar14"></div>
+            <div class="viz-bar" id="bar15"></div>
         </div>
         
-        <div class="volume-container">
-            <div class="volume-label">Volume</div>
-            <input type="range" class="volume-slider" id="volumeSlider" 
-                   min="0" max="100" value="100" onchange="setVolume(this.value)">
-        </div>
+        <button class="stop-button hidden" id="stopBtn" onclick="togglePlay()">
+            Stop Playing
+        </button>
         
-        <div class="stats">
-            <div>WebSocket: <span id="wsStatus">Not connected</span></div>
-            <div>Packets: <span id="packets">0</span></div>
-            <div>Buffer: <span id="buffer">0ms</span></div>
-            <div>Audio Context: <span id="audioState">Not started</span></div>
-            <div>Sample Rate: <span id="sampleRate">-</span></div>
+        <div class="stats" id="statsDisplay">
+            Packets: <span id="packets">0</span> | Buffer: <span id="buffer">0ms</span>
         </div>
         
         <div class="error-message" id="errorMsg"></div>
         
-        <div class="debug-log" id="debugLog"></div>
-        <button class="copy-btn" onclick="copyLog()">📋 Copy Log</button>
+        <!-- Hidden stats for internal use -->
+        <div style="display:none">
+            <span id="wsStatus">Not connected</span>
+            <span id="audioState">Not started</span>
+            <span id="sampleRate">-</span>
+        </div>
+        
+        <div class="debug-section">
+            <button class="debug-toggle" onclick="toggleDebug()">Show Debug Log</button>
+            <div class="debug-log hidden" id="debugLog"></div>
+            <button class="copy-btn hidden" id="copyBtn" onclick="copyLog()">📋 Copy Log</button>
+        </div>
     </div>
 
     <script>
@@ -281,6 +316,69 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         let isPrebuffering = true;
         let isInitialStart = true;  // Track if this is first start vs rebuffer
         
+        // Visualizer state
+        const NUM_BARS = 16;
+        let vizBars = [];
+        let vizLevels = new Array(NUM_BARS).fill(0);
+        let vizAnimFrame = null;
+        
+        function initVisualizer() {
+            vizBars = [];
+            for (let i = 0; i < NUM_BARS; i++) {
+                vizBars.push(document.getElementById('bar' + i));
+            }
+        }
+        
+        function updateVisualizer(samples) {
+            if (!samples || samples.length === 0) return;
+            
+            // Calculate RMS for different frequency bands (simplified)
+            const samplesPerBar = Math.floor(samples.length / NUM_BARS);
+            for (let i = 0; i < NUM_BARS; i++) {
+                let sum = 0;
+                const start = i * samplesPerBar;
+                for (let j = 0; j < samplesPerBar && (start + j) < samples.length; j++) {
+                    sum += Math.abs(samples[start + j]);
+                }
+                const avg = sum / samplesPerBar;
+                // Smooth the levels
+                vizLevels[i] = vizLevels[i] * 0.7 + avg * 0.3;
+            }
+        }
+        
+        function animateVisualizer() {
+            for (let i = 0; i < NUM_BARS; i++) {
+                if (vizBars[i]) {
+                    // Scale to pixel height (4-100px range)
+                    const height = Math.max(4, Math.min(100, vizLevels[i] * 300));
+                    vizBars[i].style.height = height + 'px';
+                }
+            }
+            if (isPlaying) {
+                vizAnimFrame = requestAnimationFrame(animateVisualizer);
+            }
+        }
+        
+        function resetVisualizer() {
+            vizLevels.fill(0);
+            for (let i = 0; i < NUM_BARS; i++) {
+                if (vizBars[i]) {
+                    vizBars[i].style.height = '4px';
+                }
+            }
+            if (vizAnimFrame) {
+                cancelAnimationFrame(vizAnimFrame);
+                vizAnimFrame = null;
+            }
+        }
+        
+        function toggleDebug() {
+            const log = document.getElementById('debugLog');
+            const copyBtn = document.getElementById('copyBtn');
+            log.classList.toggle('hidden');
+            copyBtn.classList.toggle('hidden');
+        }
+        
         // Debug logging
         const maxLogEntries = 50;
         function debugLog(msg, level = 'info') {
@@ -303,19 +401,19 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         }
         
         function updateStatus(status, text) {
-            const dot = document.getElementById('statusDot');
-            const statusText = document.getElementById('statusText');
+            // Update play/stop button visibility based on status
+            const playBtn = document.getElementById('playBtn');
+            const stopBtn = document.getElementById('stopBtn');
             
-            dot.className = 'status-dot';
-            if (status === 'connected') {
-                dot.classList.add('connected');
-            } else if (status === 'connecting') {
-                dot.classList.add('connecting');
-            } else if (status === 'error') {
-                dot.classList.add('error');
+            if (status === 'connected' || isPlaying) {
+                playBtn.classList.add('playing');
+                playBtn.textContent = 'Playing';
+                stopBtn.classList.remove('hidden');
+            } else {
+                playBtn.classList.remove('playing');
+                playBtn.textContent = 'Play';
+                stopBtn.classList.add('hidden');
             }
-            
-            statusText.textContent = text;
         }
         
         function showError(msg) {
@@ -388,8 +486,11 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
                 connectWebSocket();
                 
                 isPlaying = true;
-                document.getElementById('playBtn').textContent = '⏸';
-                document.getElementById('playBtn').classList.add('playing');
+                updateStatus('connected', 'Playing');
+                
+                // Start visualizer
+                initVisualizer();
+                animateVisualizer();
                 
             } catch (err) {
                 showError('Audio error: ' + err.message);
@@ -422,11 +523,11 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
             processStartTime = 0;
             totalFramesConsumed = 0;
             
-            document.getElementById('playBtn').textContent = '▶';
-            document.getElementById('playBtn').classList.remove('playing');
+            // Reset UI
+            updateStatus('', 'Stopped');
+            resetVisualizer();
             document.getElementById('wsStatus').textContent = 'Not connected';
             document.getElementById('audioState').textContent = 'Stopped';
-            updateStatus('', 'Stopped');
             debugLog('Audio stopped');
         }
         
@@ -644,6 +745,9 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
             
             bufferedSamples -= samplesNeeded;
             totalFramesConsumed += frameCount;
+            
+            // Update visualizer with current audio
+            updateVisualizer(outputL);
             
             // #region agent log - H8/H9 measure actual playback rate
             if (processCallCount % 100 === 0) {
