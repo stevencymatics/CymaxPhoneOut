@@ -253,6 +253,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         let audioContext = null;
         let gainNode = null;
         let scriptNode = null;
+        let keepAliveOsc = null;  // Silent oscillator to keep audio graph alive on iOS
         let ws = null;
         let isPlaying = false;
         let packetsReceived = 0;
@@ -367,6 +368,15 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
                 gainNode = audioContext.createGain();
                 gainNode.connect(audioContext.destination);
                 debugLog('Gain node created and connected');
+                
+                // Create silent oscillator to keep iOS audio graph alive when backgrounded
+                keepAliveOsc = audioContext.createOscillator();
+                const silentGain = audioContext.createGain();
+                silentGain.gain.value = 0.00001; // Essentially silent
+                keepAliveOsc.connect(silentGain);
+                silentGain.connect(audioContext.destination);
+                keepAliveOsc.start();
+                debugLog('Keep-alive oscillator started');
                 
                 // Create script processor for audio output (smaller buffer = lower latency)
                 scriptNode = audioContext.createScriptProcessor(512, 0, 2);
@@ -703,21 +713,25 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
                 debugLog('Tab became visible, reconnecting...', 'info');
                 
                 // Mobile browsers freeze the ScriptProcessor when backgrounded.
-                // We need to recreate it but keep AudioContext (iOS needs user gesture for new one)
+                // Force suspend/resume cycle to wake up audio graph
                 
-                // Resume AudioContext if suspended
-                if (audioContext && audioContext.state === 'suspended') {
-                    debugLog('Resuming AudioContext...', 'info');
+                if (audioContext) {
+                    debugLog('AudioContext state: ' + audioContext.state, 'info');
+                    
+                    // Force suspend then resume to restart audio graph
                     try {
+                        debugLog('Forcing audio restart...', 'info');
+                        await audioContext.suspend();
+                        await new Promise(r => setTimeout(r, 50));
                         await audioContext.resume();
-                        debugLog('AudioContext resumed: ' + audioContext.state);
+                        debugLog('AudioContext restarted: ' + audioContext.state);
                     } catch (e) {
-                        debugLog('Resume failed: ' + e.message, 'error');
+                        debugLog('Audio restart failed: ' + e.message, 'error');
                     }
                 }
                 
                 // Disconnect and recreate ScriptProcessor (it freezes when backgrounded)
-                if (scriptNode) {
+                if (scriptNode && audioContext) {
                     debugLog('Recreating ScriptProcessor...', 'info');
                     try { scriptNode.disconnect(); } catch(e) {}
                     scriptNode = audioContext.createScriptProcessor(512, 0, 2);
