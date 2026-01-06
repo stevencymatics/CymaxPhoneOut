@@ -365,10 +365,10 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
                 debugLog('Gain node created and connected');
                 
                 // Create script processor for audio output (smaller buffer = lower latency)
-                const scriptNode = audioContext.createScriptProcessor(1024, 0, 2);
+                const scriptNode = audioContext.createScriptProcessor(512, 0, 2);
                 scriptNode.onaudioprocess = processAudio;
                 scriptNode.connect(gainNode);
-                debugLog('Script processor created (buffer: 1024 frames, ~21ms)');
+                debugLog('Script processor created (buffer: 512 frames, ~11ms)');
                 
                 // Connect WebSocket
                 connectWebSocket();
