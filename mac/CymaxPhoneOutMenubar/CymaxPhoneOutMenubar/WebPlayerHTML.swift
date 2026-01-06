@@ -699,36 +699,39 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         // Auto-reconnect when tab becomes visible again (mobile browsers suspend connections)
         document.addEventListener('visibilitychange', async () => {
             if (document.visibilityState === 'visible' && isPlaying) {
-                debugLog('Tab became visible, checking connection...', 'info');
+                debugLog('Tab became visible, restarting audio...', 'info');
                 
-                // Check if WebSocket is dead
-                const wsNeedsReconnect = !ws || ws.readyState !== WebSocket.OPEN;
+                // Mobile browsers freeze the ScriptProcessor when backgrounded.
+                // The WebSocket may stay connected but audio stops flowing.
+                // Best solution: completely restart audio to get clean state.
                 
-                // Check if AudioContext is suspended (iOS does this)
-                const audioNeedsResume = audioContext && audioContext.state === 'suspended';
+                // Close existing WebSocket
+                if (ws) {
+                    ws.onclose = null; // Prevent reconnect loop
+                    ws.close();
+                    ws = null;
+                }
                 
-                if (audioNeedsResume) {
-                    debugLog('Resuming suspended AudioContext...', 'info');
+                // Close existing AudioContext
+                if (audioContext) {
                     try {
-                        await audioContext.resume();
-                        debugLog('AudioContext resumed: ' + audioContext.state);
-                    } catch (e) {
-                        debugLog('Failed to resume AudioContext: ' + e.message, 'error');
-                    }
+                        await audioContext.close();
+                    } catch (e) {}
+                    audioContext = null;
                 }
                 
-                if (wsNeedsReconnect) {
-                    debugLog('WebSocket disconnected, reconnecting...', 'warn');
-                    // Reset buffer state for clean reconnect
-                    bufferedSamples = 0;
-                    writePos = 0;
-                    readPos = 0;
-                    isPrebuffering = true;
-                    isInitialStart = true;
-                    connectWebSocket();
-                } else {
-                    debugLog('Connection still active');
-                }
+                // Reset all buffer state
+                bufferedSamples = 0;
+                writePos = 0;
+                readPos = 0;
+                isPrebuffering = true;
+                isInitialStart = true;
+                packetsReceived = 0;
+                sourceRateSet = false;
+                
+                // Restart fresh
+                debugLog('Restarting audio pipeline...', 'info');
+                await startAudio();
                 
                 updateStatus('connected', 'Reconnected');
             }
