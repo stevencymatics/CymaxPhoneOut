@@ -18,6 +18,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Cymax Audio</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='none' stroke='%23f5a623' stroke-width='6'/><polygon points='40,30 40,70 72,50' fill='%23f5a623'/></svg>">
     <style>
         * {
             box-sizing: border-box;
@@ -57,29 +58,49 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         }
         
         .play-button {
-            padding: 16px 48px;
-            border-radius: 8px;
-            border: 2px solid #22c55e;
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            border: 3px solid #f5a623;
             background: transparent;
-            color: #22c55e;
-            font-size: 1.2rem;
-            font-weight: 600;
             cursor: pointer;
             margin: 0 auto 30px;
             transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
         }
         
         .play-button:hover {
-            background: rgba(34, 197, 94, 0.1);
+            background: rgba(245, 166, 35, 0.1);
+            transform: scale(1.05);
         }
         
         .play-button:active {
-            transform: scale(0.98);
+            transform: scale(0.95);
         }
         
-        .play-button.playing {
-            background: #22c55e;
-            color: #000;
+        .play-button svg {
+            width: 40px;
+            height: 40px;
+            fill: #f5a623;
+        }
+        
+        .play-button .play-icon {
+            margin-left: 6px; /* Optical centering for play triangle */
+        }
+        
+        .play-button .pause-icon {
+            display: none;
+        }
+        
+        .play-button.playing .play-icon {
+            display: none;
+        }
+        
+        .play-button.playing .pause-icon {
+            display: block;
         }
         
         /* Visualizer */
@@ -99,28 +120,6 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
             background: linear-gradient(to top, #22c55e, #4ade80);
             border-radius: 2px;
             transition: height 0.05s ease-out;
-        }
-        
-        /* Stop button */
-        .stop-button {
-            padding: 16px 48px;
-            border-radius: 8px;
-            border: none;
-            background: rgba(248, 113, 113, 0.8);
-            color: #fff;
-            font-size: 1.1rem;
-            font-weight: 600;
-            cursor: pointer;
-            margin: 20px auto;
-            transition: all 0.2s;
-        }
-        
-        .stop-button:hover {
-            background: rgba(248, 113, 113, 1);
-        }
-        
-        .stop-button:active {
-            transform: scale(0.98);
         }
         
         .hidden {
@@ -234,7 +233,13 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         <p class="subtitle">Disable Silent Mode for sound to play</p>
         
         <button class="play-button" id="playBtn" onclick="togglePlay()">
-            Play
+            <svg class="play-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <polygon points="5,3 19,12 5,21"/>
+            </svg>
+            <svg class="pause-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <rect x="5" y="3" width="4" height="18"/>
+                <rect x="15" y="3" width="4" height="18"/>
+            </svg>
         </button>
         
         <!-- Visualizer bars -->
@@ -257,9 +262,6 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
             <div class="viz-bar" id="bar15"></div>
         </div>
         
-        <button class="stop-button hidden" id="stopBtn" onclick="togglePlay()">
-            Stop Playing
-        </button>
         
         <div class="stats" id="statsDisplay">
             Packets: <span id="packets">0</span> | Buffer: <span id="buffer">0ms</span>
@@ -401,18 +403,12 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         }
         
         function updateStatus(status, text) {
-            // Update play/stop button visibility based on status
             const playBtn = document.getElementById('playBtn');
-            const stopBtn = document.getElementById('stopBtn');
             
             if (status === 'connected' || isPlaying) {
                 playBtn.classList.add('playing');
-                playBtn.textContent = 'Playing';
-                stopBtn.classList.remove('hidden');
             } else {
                 playBtn.classList.remove('playing');
-                playBtn.textContent = 'Play';
-                stopBtn.classList.add('hidden');
             }
         }
         
