@@ -451,11 +451,10 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
                 // This helps unlock the audio session for playback mode
                 try {
                     const silentAudio = document.getElementById('silentAudio');
-                    await silentAudio.play();
-                    debugLog('Silent audio element played');
-                } catch (e) {
-                    debugLog('Silent audio play failed: ' + e.message);
-                }
+                    silentAudio.play().then(() => {
+                        debugLog('Silent audio element playing');
+                    }).catch(() => {});
+                } catch (e) {}
                 
                 // Create audio context (must be after user gesture)
                 // Let browser pick its native rate - we'll resample
