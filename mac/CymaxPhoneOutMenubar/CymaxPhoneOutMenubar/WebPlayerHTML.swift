@@ -293,9 +293,9 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         </div>
     </div>
     
-    <!-- Hidden audio element to enable playback in iOS silent mode -->
-    <audio id="silentAudio" playsinline style="display:none">
-        <source src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA" type="audio/wav">
+    <!-- Hidden audio element to enable playback in iOS silent mode - must loop -->
+    <audio id="silentAudio" playsinline loop style="display:none">
+        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2LkZCOi4R4aF1TUVpeZ3KAjJKUk46GfG9iVk1OVGFxgI6XmpmVjYJ1ZldNSk9daXmJl56em5KGd2RRSE1YaHmJl56em5KGd2RRSE1YaHmJl56em5KGd2RRSE1YaHmJl56em5KGd2RRSE1YaHmJl56em5KGd2RRSE1YaHmJl56em5KGd2RRSE1YaHmJl56em5KGd2RRSE1YaHmJl56em5KGd2RRSE1YaHmJl56em5KGd2RRSE1YaHmJl56em5KGd2RRSE1YaHmJl56em5KGd2RRSE1YaHmJl56em5KGd2RRSE1YaHmJl56em5KGd2RRSE1YaHmJl56em5KGd2RRSE1YaHmJl56em5KGd2RRSE1YaHmJl56em5KGd2RRSE1YaHmJl56em5KGd2RRSE1YaHmJl56em5KGd2RRSE1YaHk=" type="audio/wav">
     </audio>
 
     <script>
@@ -446,13 +446,16 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
                 updateStatus('connecting', 'Starting...');
                 debugLog('Starting audio...');
                 
-                // iOS Silent Mode workaround: Play silent audio to unlock media playback mode
-                // This makes audio play even when the phone's mute switch is on
+                // iOS Silent Mode workaround: Play looping silent audio to unlock media playback mode
+                // This forces iOS into "media" category which ignores the mute switch
                 try {
                     const silentAudio = document.getElementById('silentAudio');
-                    silentAudio.play().catch(() => {});
-                    debugLog('Silent audio trigger played (iOS silent mode workaround)');
-                } catch (e) {}
+                    silentAudio.volume = 0.01; // Nearly silent but not zero
+                    await silentAudio.play();
+                    debugLog('Silent audio looping (iOS silent mode workaround active)');
+                } catch (e) {
+                    debugLog('Silent audio failed: ' + e.message, 'warn');
+                }
                 
                 // Create audio context (must be after user gesture)
                 // Let browser pick its native rate - we'll resample
@@ -520,6 +523,12 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         
         function stopAudio() {
             debugLog('Stopping audio...');
+            
+            // Stop silent audio
+            try {
+                const silentAudio = document.getElementById('silentAudio');
+                silentAudio.pause();
+            } catch (e) {}
             
             if (ws) {
                 ws.close();
