@@ -61,8 +61,8 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
             width: 100px;
             height: 100px;
             border-radius: 50%;
-            border: 3px solid #f5a623;
-            background: transparent;
+            border: none;
+            background: #f5a623;
             cursor: pointer;
             margin: 0 auto 30px;
             transition: all 0.2s;
@@ -73,7 +73,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         }
         
         .play-button:hover {
-            background: rgba(245, 166, 35, 0.1);
+            background: #e6991a;
             transform: scale(1.05);
         }
         
@@ -84,7 +84,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         .play-button svg {
             width: 40px;
             height: 40px;
-            fill: #f5a623;
+            fill: #000;
         }
         
         .play-button .play-icon {
@@ -230,7 +230,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
 <body>
     <div class="container">
         <h1>Cymax Audio</h1>
-        <p class="subtitle">Disable Silent Mode for sound to play</p>
+        <p class="subtitle">Stream audio from your Mac</p>
         
         <button class="play-button" id="playBtn" onclick="togglePlay()">
             <svg class="play-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -279,9 +279,14 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         <div class="debug-section">
             <button class="debug-toggle" onclick="toggleDebug()">Show Debug Log</button>
             <div class="debug-log hidden" id="debugLog"></div>
-            <button class="copy-btn hidden" id="copyBtn" onclick="copyLog()">📋 Copy Log</button>
+            <button class="copy-btn hidden" id="copyBtn" onclick="copyLog()">Copy Log</button>
         </div>
     </div>
+    
+    <!-- Hidden audio element to enable playback in iOS silent mode -->
+    <audio id="silentAudio" playsinline style="display:none">
+        <source src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA" type="audio/wav">
+    </audio>
 
     <script>
         const WS_HOST = '\(hostIP)';
@@ -430,6 +435,14 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
                 showError('');
                 updateStatus('connecting', 'Starting...');
                 debugLog('Starting audio...');
+                
+                // iOS Silent Mode workaround: Play silent audio to unlock media playback mode
+                // This makes audio play even when the phone's mute switch is on
+                try {
+                    const silentAudio = document.getElementById('silentAudio');
+                    silentAudio.play().catch(() => {});
+                    debugLog('Silent audio trigger played (iOS silent mode workaround)');
+                } catch (e) {}
                 
                 // Create audio context (must be after user gesture)
                 // Let browser pick its native rate - we'll resample
