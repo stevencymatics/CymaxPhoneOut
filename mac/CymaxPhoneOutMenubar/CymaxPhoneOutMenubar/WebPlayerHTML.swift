@@ -708,7 +708,9 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
                 // Close existing WebSocket
                 if (ws) {
                     ws.onclose = null; // Prevent reconnect loop
-                    ws.close();
+                    ws.onerror = null; // Prevent error handlers
+                    ws.onmessage = null;
+                    try { ws.close(); } catch(e) {}
                     ws = null;
                 }
                 
@@ -728,6 +730,10 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
                 isInitialStart = true;
                 packetsReceived = 0;
                 sourceRateSet = false;
+                
+                // Wait a moment for cleanup before reconnecting
+                debugLog('Waiting for cleanup...', 'info');
+                await new Promise(resolve => setTimeout(resolve, 300));
                 
                 // Restart fresh
                 debugLog('Restarting audio pipeline...', 'info');
