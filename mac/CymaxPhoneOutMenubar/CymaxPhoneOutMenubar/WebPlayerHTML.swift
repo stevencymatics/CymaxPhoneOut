@@ -252,6 +252,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         
         let audioContext = null;
         let gainNode = null;
+        let scriptNode = null;
         let ws = null;
         let isPlaying = false;
         let packetsReceived = 0;
@@ -368,7 +369,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
                 debugLog('Gain node created and connected');
                 
                 // Create script processor for audio output (smaller buffer = lower latency)
-                const scriptNode = audioContext.createScriptProcessor(512, 0, 2);
+                scriptNode = audioContext.createScriptProcessor(512, 0, 2);
                 scriptNode.onaudioprocess = processAudio;
                 scriptNode.connect(gainNode);
                 debugLog('Script processor created (buffer: 512 frames, ~11ms)');
@@ -702,8 +703,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
                 debugLog('Tab became visible, reconnecting...', 'info');
                 
                 // Mobile browsers freeze the ScriptProcessor when backgrounded.
-                // Keep AudioContext alive (iOS needs user gesture to create new one)
-                // Just reconnect WebSocket and clear stale buffer.
+                // We need to recreate it but keep AudioContext (iOS needs user gesture for new one)
                 
                 // Resume AudioContext if suspended
                 if (audioContext && audioContext.state === 'suspended') {
@@ -714,6 +714,16 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
                     } catch (e) {
                         debugLog('Resume failed: ' + e.message, 'error');
                     }
+                }
+                
+                // Disconnect and recreate ScriptProcessor (it freezes when backgrounded)
+                if (scriptNode) {
+                    debugLog('Recreating ScriptProcessor...', 'info');
+                    try { scriptNode.disconnect(); } catch(e) {}
+                    scriptNode = audioContext.createScriptProcessor(512, 0, 2);
+                    scriptNode.onaudioprocess = processAudio;
+                    scriptNode.connect(gainNode);
+                    debugLog('ScriptProcessor recreated');
                 }
                 
                 // Close existing WebSocket and reconnect
@@ -733,7 +743,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
                 isInitialStart = true;
                 packetsReceived = 0;
                 
-                // Wait a moment then reconnect WebSocket only
+                // Wait a moment then reconnect WebSocket
                 await new Promise(resolve => setTimeout(resolve, 200));
                 debugLog('Reconnecting WebSocket...', 'info');
                 connectWebSocket();
