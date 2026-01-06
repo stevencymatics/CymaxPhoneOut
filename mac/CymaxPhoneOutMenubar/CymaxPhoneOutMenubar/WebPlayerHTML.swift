@@ -271,10 +271,13 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         
         // Target buffer level (samples) - optimized for low latency
         const TARGET_BUFFER_MS = 80;   // Tight: was 85ms
-        const PREBUFFER_MS = 45;       // Edge of safe: was 50ms
+        const INITIAL_PREBUFFER_MS = 20;  // Quick start on play
+        const REBUFFER_MS = 45;           // Safe recovery after underrun
         let targetBufferSamples = 48000 * 2 * (TARGET_BUFFER_MS / 1000);
-        let prebufferSamples = 48000 * 2 * (PREBUFFER_MS / 1000);
+        let prebufferSamples = 48000 * 2 * (INITIAL_PREBUFFER_MS / 1000);
+        let rebufferSamples = 48000 * 2 * (REBUFFER_MS / 1000);
         let isPrebuffering = true;
+        let isInitialStart = true;  // Track if this is first start vs rebuffer
         
         // Debug logging
         const maxLogEntries = 50;
@@ -403,6 +406,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
             writePos = 0;
             readPos = 0;
             isPrebuffering = true;
+            isInitialStart = true;  // Reset so next play is fast
             processCallCount = 0;
             processStartTime = 0;
             totalFramesConsumed = 0;
@@ -583,28 +587,33 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
             const samplesNeeded = frameCount * 2; // stereo
             
             // Prebuffering phase - wait until we have enough buffer before starting
+            // Use smaller threshold for initial start, larger for recovery after underrun
+            const currentThreshold = isInitialStart ? prebufferSamples : rebufferSamples;
+            
             if (isPrebuffering) {
-                if (bufferedSamples < prebufferSamples) {
+                if (bufferedSamples < currentThreshold) {
                     // Still prebuffering - output silence
                     for (let i = 0; i < frameCount; i++) {
                         outputL[i] = 0;
                         outputR[i] = 0;
                     }
                     if (packetsReceived % 50 === 0) {
-                        const pct = Math.round((bufferedSamples / prebufferSamples) * 100);
-                        debugLog('Prebuffering: ' + pct + '% (' + Math.round(bufferedSamples/2/outputRate*1000) + 'ms)');
+                        const pct = Math.round((bufferedSamples / currentThreshold) * 100);
+                        const mode = isInitialStart ? 'Starting' : 'Rebuffering';
+                        debugLog(mode + ': ' + pct + '% (' + Math.round(bufferedSamples/2/outputRate*1000) + 'ms)');
                     }
                     return;
                 } else {
                     isPrebuffering = false;
-                    debugLog('Prebuffer complete! Starting playback with ' + Math.round(bufferedSamples/2/outputRate*1000) + 'ms buffer', 'info');
+                    isInitialStart = false;  // After first start, use rebuffer threshold
+                    debugLog('Playback started with ' + Math.round(bufferedSamples/2/outputRate*1000) + 'ms buffer', 'info');
                 }
             }
             
             if (bufferedSamples < samplesNeeded) {
                 // Underrun - output silence and start rebuffering
                 underrunCount++;
-                isPrebuffering = true;  // Go back to prebuffering
+                isPrebuffering = true;  // Go back to prebuffering (will use rebufferSamples)
                 debugLog('Buffer underrun #' + underrunCount + ', need ' + samplesNeeded + ', have ' + bufferedSamples + ' - rebuffering...', 'warn');
                 for (let i = 0; i < frameCount; i++) {
                     outputL[i] = 0;
