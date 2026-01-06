@@ -695,6 +695,44 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         if ('wakeLock' in navigator) {
             navigator.wakeLock.request('screen').catch(() => {});
         }
+        
+        // Auto-reconnect when tab becomes visible again (mobile browsers suspend connections)
+        document.addEventListener('visibilitychange', async () => {
+            if (document.visibilityState === 'visible' && isPlaying) {
+                debugLog('Tab became visible, checking connection...', 'info');
+                
+                // Check if WebSocket is dead
+                const wsNeedsReconnect = !ws || ws.readyState !== WebSocket.OPEN;
+                
+                // Check if AudioContext is suspended (iOS does this)
+                const audioNeedsResume = audioContext && audioContext.state === 'suspended';
+                
+                if (audioNeedsResume) {
+                    debugLog('Resuming suspended AudioContext...', 'info');
+                    try {
+                        await audioContext.resume();
+                        debugLog('AudioContext resumed: ' + audioContext.state);
+                    } catch (e) {
+                        debugLog('Failed to resume AudioContext: ' + e.message, 'error');
+                    }
+                }
+                
+                if (wsNeedsReconnect) {
+                    debugLog('WebSocket disconnected, reconnecting...', 'warn');
+                    // Reset buffer state for clean reconnect
+                    bufferedSamples = 0;
+                    writePos = 0;
+                    readPos = 0;
+                    isPrebuffering = true;
+                    isInitialStart = true;
+                    connectWebSocket();
+                } else {
+                    debugLog('Connection still active');
+                }
+                
+                updateStatus('connected', 'Reconnected');
+            }
+        });
     </script>
 </body>
 </html>
