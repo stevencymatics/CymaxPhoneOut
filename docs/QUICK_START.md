@@ -66,7 +66,7 @@ Right-click the app → Open → Open
 
 ### Phone can't connect
 - Make sure both devices are on the **same WiFi network**
-- Check that no firewall is blocking ports 8080 and 19622
+- Check that no firewall is blocking ports 19621 and 19622
 - Try refreshing the page on your phone
 
 ## Tips

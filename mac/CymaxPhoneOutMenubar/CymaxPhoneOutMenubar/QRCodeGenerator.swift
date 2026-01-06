@@ -97,12 +97,13 @@ class QRCodeGenerator {
     }
     
     /// Generate the full URL for the web player
-    static func getWebPlayerURL(httpPort: UInt16 = 8080) -> String? {
+    static func getWebPlayerURL(httpPort: UInt16 = 19621) -> String? {
         guard let ip = getLocalIPAddress() else {
             return nil
         }
         return "http://\(ip):\(httpPort)"
     }
 }
+
 
 

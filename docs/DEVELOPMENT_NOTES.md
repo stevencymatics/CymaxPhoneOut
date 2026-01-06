@@ -103,7 +103,7 @@ BUFFER_SIZE = 3 seconds // Max circular buffer capacity
 ### Ports Used
 | Port | Protocol | Purpose |
 |------|----------|---------|
-| 8080 | HTTP | Serves web player HTML |
+| 19621 | HTTP | Serves web player HTML |
 | 19622 | WebSocket | Audio streaming |
 
 ### Packet Format (WebSocket)

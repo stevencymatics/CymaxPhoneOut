@@ -22,7 +22,7 @@ class HTTPServer {
     /// WebSocket port for the player to connect to
     var webSocketPort: UInt16 = 19622
     
-    init(port: UInt16 = 8080) {
+    init(port: UInt16 = 19621) {
         self.port = port
     }
     
@@ -178,5 +178,6 @@ class HTTPServer {
         })
     }
 }
+
 
 

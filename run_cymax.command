@@ -6,3 +6,4 @@ open ~/Library/Developer/Xcode/DerivedData/CymaxPhoneOutMenubar-*/Build/Products
 echo "✓ Cymax Audio launched! Look for waveform icon in menubar."
 
 
+

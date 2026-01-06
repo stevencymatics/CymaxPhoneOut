@@ -57,7 +57,7 @@ class AppState: ObservableObject {
     private var sequenceNumber: UInt32 = 0
     
     // Ports
-    private let httpPort: UInt16 = 8080
+    private let httpPort: UInt16 = 19621  // Unique port to avoid conflicts with other dev servers
     private let wsPort: UInt16 = 19622
     
     init() {

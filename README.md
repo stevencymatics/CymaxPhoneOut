@@ -82,7 +82,7 @@ Phone Audio Project/
 │         │                                                    │
 │  ┌──────▼───────┐    ┌─────────────────────────────────┐    │
 │  │ HTTP Server  │    │      WebSocket Server           │    │
-│  │  (Port 8080) │    │       (Port 19622)              │    │
+│  │  (Port 19621)│    │       (Port 19622)              │    │
 │  │              │    │                                  │    │
 │  │ Serves web   │    │  Streams audio packets          │    │
 │  │ player HTML  │    │  128 frames/packet              │    │
