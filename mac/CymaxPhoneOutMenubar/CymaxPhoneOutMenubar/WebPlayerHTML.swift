@@ -40,7 +40,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
             align-items: center;
             justify-content: center;
             color: #fff;
-            padding: 20px;
+            padding: 10px;
             touch-action: manipulation;
             -webkit-touch-callout: none;
             -webkit-user-select: none;
@@ -50,31 +50,32 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         
         .container {
             text-align: center;
-            max-width: 400px;
+            max-width: 100%;
             width: 100%;
+            padding: 0 10px;
         }
         
         h1 {
-            font-size: 1.8rem;
-            margin-bottom: 8px;
+            font-size: 3rem;
+            margin-bottom: 12px;
             font-weight: 600;
             color: #fff;
         }
         
         .subtitle {
             color: #888;
-            margin-bottom: 35px;
-            font-size: 0.9rem;
+            margin-bottom: 50px;
+            font-size: 1.4rem;
         }
         
         .play-button {
-            width: 100px;
-            height: 100px;
+            width: 160px;
+            height: 160px;
             border-radius: 50%;
             border: none;
             background: #f5a623;
             cursor: pointer;
-            margin: 0 auto 15px;
+            margin: 0 auto 25px;
             transition: all 0.2s;
             display: flex;
             align-items: center;
@@ -92,13 +93,13 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         }
         
         .play-button svg {
-            width: 40px;
-            height: 40px;
+            width: 70px;
+            height: 70px;
             fill: #000;
         }
         
         .play-button .play-icon {
-            margin-left: 6px; /* Optical centering for play triangle */
+            margin-left: 10px; /* Optical centering for play triangle */
         }
         
         .play-button .pause-icon {
@@ -116,19 +117,19 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         /* Visualizer */
         .visualizer-container {
             width: 100%;
-            height: 120px;
-            margin: 10px 0 20px 0;
+            height: 200px;
+            margin: 20px 0 30px 0;
             display: flex;
             align-items: flex-end;
             justify-content: center;
-            gap: 4px;
+            gap: 8px;
         }
         
         .viz-bar {
-            width: 8px;
-            min-height: 4px;
+            width: 16px;
+            min-height: 8px;
             background: linear-gradient(to top, #f5a623, #ffc966);
-            border-radius: 2px;
+            border-radius: 4px;
             transition: height 0.05s ease-out;
         }
         
@@ -176,8 +177,8 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         }
         
         .stats {
-            margin-top: 20px;
-            font-size: 0.8rem;
+            margin-top: 30px;
+            font-size: 1.4rem;
             color: #666;
         }
         
@@ -362,8 +363,8 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         function animateVisualizer() {
             for (let i = 0; i < NUM_BARS; i++) {
                 if (vizBars[i]) {
-                    // Scale to pixel height (4-100px range)
-                    const height = Math.max(4, Math.min(100, vizLevels[i] * 300));
+                    // Scale to pixel height (8-180px range)
+                    const height = Math.max(8, Math.min(180, vizLevels[i] * 500));
                     vizBars[i].style.height = height + 'px';
                 }
             }
@@ -376,7 +377,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
             vizLevels.fill(0);
             for (let i = 0; i < NUM_BARS; i++) {
                 if (vizBars[i]) {
-                    vizBars[i].style.height = '4px';
+                    vizBars[i].style.height = '8px';
                 }
             }
             if (vizAnimFrame) {
