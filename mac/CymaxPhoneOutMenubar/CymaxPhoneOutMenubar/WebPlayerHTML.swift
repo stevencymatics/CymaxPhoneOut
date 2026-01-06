@@ -294,8 +294,8 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         </div>
     </div>
     
-    <!-- Hidden audio element to enable playback in iOS silent mode -->
-    <audio id="silentAudio" playsinline style="display:none">
+    <!-- Hidden audio element to enable playback in iOS silent mode - loops to keep session active -->
+    <audio id="silentAudio" playsinline loop style="display:none">
         <source src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA" type="audio/wav">
     </audio>
 
@@ -447,13 +447,15 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
                 updateStatus('connecting', 'Starting...');
                 debugLog('Starting audio...');
                 
-                // iOS Silent Mode workaround: Play silent audio to unlock media playback mode
-                // This makes audio play even when the phone's mute switch is on
+                // iOS Silent Mode workaround: Play silent audio element first
+                // This helps unlock the audio session for playback mode
                 try {
                     const silentAudio = document.getElementById('silentAudio');
-                    silentAudio.play().catch(() => {});
-                    debugLog('Silent audio trigger played (iOS silent mode workaround)');
-                } catch (e) {}
+                    await silentAudio.play();
+                    debugLog('Silent audio element played');
+                } catch (e) {
+                    debugLog('Silent audio play failed: ' + e.message);
+                }
                 
                 // Create audio context (must be after user gesture)
                 // Let browser pick its native rate - we'll resample
@@ -487,14 +489,16 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
                 gainNode.connect(audioContext.destination);
                 debugLog('Gain node created and connected');
                 
-                // Create silent oscillator to keep iOS audio graph alive when backgrounded
+                // Create inaudible oscillator to keep iOS in playback mode
+                // Uses 1Hz (below human hearing) at low gain to force audio session active
                 keepAliveOsc = audioContext.createOscillator();
+                keepAliveOsc.frequency.value = 1; // 1Hz - completely inaudible
                 const silentGain = audioContext.createGain();
-                silentGain.gain.value = 0.00001; // Essentially silent
+                silentGain.gain.value = 0.001; // Very quiet but not zero
                 keepAliveOsc.connect(silentGain);
                 silentGain.connect(audioContext.destination);
                 keepAliveOsc.start();
-                debugLog('Keep-alive oscillator started');
+                debugLog('Keep-alive oscillator started (1Hz inaudible tone)');
                 
                 // Create script processor for audio output (smaller buffer = lower latency)
                 scriptNode = audioContext.createScriptProcessor(512, 0, 2);
