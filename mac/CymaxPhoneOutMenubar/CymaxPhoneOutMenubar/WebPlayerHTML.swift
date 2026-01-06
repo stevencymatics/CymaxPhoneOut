@@ -699,45 +699,44 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         // Auto-reconnect when tab becomes visible again (mobile browsers suspend connections)
         document.addEventListener('visibilitychange', async () => {
             if (document.visibilityState === 'visible' && isPlaying) {
-                debugLog('Tab became visible, restarting audio...', 'info');
+                debugLog('Tab became visible, reconnecting...', 'info');
                 
                 // Mobile browsers freeze the ScriptProcessor when backgrounded.
-                // The WebSocket may stay connected but audio stops flowing.
-                // Best solution: completely restart audio to get clean state.
+                // Keep AudioContext alive (iOS needs user gesture to create new one)
+                // Just reconnect WebSocket and clear stale buffer.
                 
-                // Close existing WebSocket
+                // Resume AudioContext if suspended
+                if (audioContext && audioContext.state === 'suspended') {
+                    debugLog('Resuming AudioContext...', 'info');
+                    try {
+                        await audioContext.resume();
+                        debugLog('AudioContext resumed: ' + audioContext.state);
+                    } catch (e) {
+                        debugLog('Resume failed: ' + e.message, 'error');
+                    }
+                }
+                
+                // Close existing WebSocket and reconnect
                 if (ws) {
-                    ws.onclose = null; // Prevent reconnect loop
-                    ws.onerror = null; // Prevent error handlers
+                    ws.onclose = null;
+                    ws.onerror = null;
                     ws.onmessage = null;
                     try { ws.close(); } catch(e) {}
                     ws = null;
                 }
                 
-                // Close existing AudioContext
-                if (audioContext) {
-                    try {
-                        await audioContext.close();
-                    } catch (e) {}
-                    audioContext = null;
-                }
-                
-                // Reset all buffer state
+                // Clear stale buffer data
                 bufferedSamples = 0;
                 writePos = 0;
                 readPos = 0;
                 isPrebuffering = true;
                 isInitialStart = true;
                 packetsReceived = 0;
-                sourceRateSet = false;
                 
-                // Wait a moment for cleanup before reconnecting
-                debugLog('Waiting for cleanup...', 'info');
-                await new Promise(resolve => setTimeout(resolve, 300));
-                
-                // Restart fresh
-                debugLog('Restarting audio pipeline...', 'info');
-                await startAudio();
+                // Wait a moment then reconnect WebSocket only
+                await new Promise(resolve => setTimeout(resolve, 200));
+                debugLog('Reconnecting WebSocket...', 'info');
+                connectWebSocket();
                 
                 updateStatus('connected', 'Reconnected');
             }
