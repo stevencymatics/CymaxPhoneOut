@@ -16,7 +16,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Cymax Audio</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='none' stroke='%23f5a623' stroke-width='6'/><polygon points='40,30 40,70 72,50' fill='%23f5a623'/></svg>">
     <style>
@@ -24,6 +24,11 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
+        }
+        
+        html {
+            touch-action: manipulation;
+            -ms-touch-action: manipulation;
         }
         
         body {
@@ -36,6 +41,11 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
             justify-content: center;
             color: #fff;
             padding: 20px;
+            touch-action: manipulation;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            overscroll-behavior: none;
         }
         
         .container {
@@ -53,7 +63,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         
         .subtitle {
             color: #888;
-            margin-bottom: 20px;
+            margin-bottom: 35px;
             font-size: 0.9rem;
         }
         
@@ -819,6 +829,19 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         if ('wakeLock' in navigator) {
             navigator.wakeLock.request('screen').catch(() => {});
         }
+        
+        // Prevent pinch zoom
+        document.addEventListener('gesturestart', function(e) { e.preventDefault(); }, { passive: false });
+        document.addEventListener('gesturechange', function(e) { e.preventDefault(); }, { passive: false });
+        document.addEventListener('gestureend', function(e) { e.preventDefault(); }, { passive: false });
+        
+        // Prevent double-tap zoom
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', function(e) {
+            const now = Date.now();
+            if (now - lastTouchEnd <= 300) { e.preventDefault(); }
+            lastTouchEnd = now;
+        }, { passive: false });
         
         // Auto-reconnect when tab becomes visible again (mobile browsers suspend connections)
         document.addEventListener('visibilitychange', async () => {
