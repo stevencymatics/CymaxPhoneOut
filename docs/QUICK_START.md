@@ -1,114 +1,80 @@
 # Quick Start Guide
 
-Get up and running in 5 minutes.
+Get Cymax Audio running in under 2 minutes!
 
 ## Prerequisites
 
-- Mac running macOS 13+ (Ventura or newer)
-- iPhone running iOS 16+
-- Both devices on the same WiFi network
-- Xcode 15+ installed
+- macOS 13+ (Ventura or later)
+- iPhone/iPad with a web browser
+- Mac and phone on the same WiFi network
 
-## Step 1: Install the Audio Driver (Mac)
+## Step 1: Build & Run (Mac)
 
+### Option A: Using Xcode
+1. Open `mac/CymaxPhoneOutMenubar/CymaxPhoneOutMenubar.xcodeproj`
+2. Press `⌘R` to build and run
+
+### Option B: Command Line
 ```bash
-cd "/Users/stevencymatics/Documents/Phone Audio Project"
-
-# Build the driver
-xcodebuild -project mac/CymaxPhoneOutDriver/CymaxPhoneOutDriver.xcodeproj \
-  -scheme CymaxPhoneOutDriver -configuration Release
-
-# Install it
-sudo cp -R build/DerivedData/Build/Products/Release/CymaxPhoneOutDriver.driver \
-  /Library/Audio/Plug-Ins/HAL/
-
-# Restart Core Audio
-sudo killall coreaudiod
+cd mac/CymaxPhoneOutMenubar
+xcodebuild -scheme CymaxPhoneOutMenubar -configuration Debug
+open ~/Library/Developer/Xcode/DerivedData/CymaxPhoneOutMenubar-*/Build/Products/Debug/CymaxPhoneOutMenubar.app
 ```
 
-## Step 2: Run the iOS App (iPhone)
+## Step 2: Grant Permission
 
-1. Open `ios/CymaxPhoneReceiver/CymaxPhoneReceiver.xcodeproj` in Xcode
-2. Select your iPhone as the target device
-3. Click Run (⌘R)
-4. On the iPhone, tap **"Start Receiving"**
-5. Note the IP address shown (e.g., `192.168.1.201`)
+When the app first runs, macOS will ask for **Screen Recording** permission.
 
-## Step 3: Run the Mac Menubar App
+1. Click "Open System Settings" when prompted
+2. Enable the toggle for "Cymax Audio" (or CymaxPhoneOutMenubar)
+3. You may need to restart the app after granting permission
 
-```bash
-cd "/Users/stevencymatics/Documents/Phone Audio Project"
+> **Why Screen Recording?** This is how macOS allows apps to capture system audio via ScreenCaptureKit.
 
-# Build and run
-xcodebuild -project mac/CymaxPhoneOutMenubar/CymaxPhoneOutMenubar.xcodeproj \
-  -scheme CymaxPhoneOutMenubar -configuration Debug
+## Step 3: Connect Your Phone
 
-# Run the app
-open build/DerivedData/Build/Products/Debug/CymaxPhoneOutMenubar.app
-```
+1. Look for the 📡 icon in your Mac's menubar
+2. Click it to see the QR code
+3. **Scan the QR code** with your iPhone camera
+4. Tap the link to open in your browser
+5. Tap the **Play** button
 
-Or open the project in Xcode and press ⌘R.
+## Step 4: Play Audio
 
-## Step 4: Connect
+Play any audio on your Mac - it will stream to your phone!
 
-1. Click the antenna icon in Mac menubar
-2. Enter the iPhone's IP address
-3. Click **Connect**
-4. iPhone should show "Connected to [Your Mac Name]"
-
-## Step 5: Select Audio Output
-
-1. Open **System Settings → Sound → Output**
-2. Select **"Cymax Phone Out (MVP)"**
-3. Play any audio on your Mac
-4. You should hear it on your iPhone! 🎉
-
-## Using with FL Studio
-
-1. Open FL Studio
-2. Go to **Options → Audio Settings**
-3. Select **"Cymax Phone Out (MVP)"** as output
-4. Set buffer to **2048 samples**
-5. Set sample rate to **48000 Hz**
+- ✅ Apple Music
+- ✅ Spotify
+- ✅ YouTube
+- ✅ FL Studio / Logic Pro
+- ✅ Any app that plays audio
 
 ## Troubleshooting
 
-### No sound?
+### No audio on phone
+- Make sure audio is actually playing on your Mac
+- Check that the phone's volume is up
+- Look at the "Buffer" indicator - should show 100-300ms
 
-```bash
-# Check driver is installed
-ls /Library/Audio/Plug-Ins/HAL/ | grep Cymax
+### "Screen Recording permission required"
+1. Open System Settings → Privacy & Security → Screen Recording
+2. Find and enable "Cymax Audio" or "CymaxPhoneOutMenubar"
+3. Restart the Mac app
 
-# Restart Core Audio
-sudo killall coreaudiod
+### App won't open (security warning)
+Right-click the app → Open → Open
 
-# Verify IP file
-cat /tmp/cymax_dest_ip.txt
-```
-
-### Pops/clicks?
-
-- Switch to **Stable** mode in iOS app
-- Increase FL Studio buffer to 2048+
-- Make sure WiFi signal is strong
-
-### Driver not showing up?
-
-```bash
-# Reinstall driver
-sudo rm -rf /Library/Audio/Plug-Ins/HAL/CymaxPhoneOutDriver.driver
-sudo cp -R [path-to-driver]/CymaxPhoneOutDriver.driver /Library/Audio/Plug-Ins/HAL/
-sudo killall coreaudiod
-```
+### Phone can't connect
+- Make sure both devices are on the **same WiFi network**
+- Check that no firewall is blocking ports 8080 and 19622
+- Try refreshing the page on your phone
 
 ## Tips
 
-- Keep iPhone screen on while streaming (prevents network throttling)
-- For best quality, use 5GHz WiFi
-- USB tethering (when implemented) will give lower latency
+- **Keep your phone's screen on** while streaming (or audio may pause)
+- **Buffer of 150-250ms** is normal and provides smooth playback
+- **Close other browser tabs** playing audio on your phone
 
 ## Need More Help?
 
-See the full [README.md](../README.md) and [DEVELOPMENT_NOTES.md](DEVELOPMENT_NOTES.md).
-
-
+Check the main [README.md](../README.md) or open an issue on GitHub!

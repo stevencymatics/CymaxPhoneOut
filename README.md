@@ -171,6 +171,33 @@ This was caused by ScreenCaptureKit outputting **non-interleaved** audio. Fixed 
 
 Close any extra browser tabs that may have the player open.
 
+## 📦 Distribution (For Testers)
+
+Want to share Cymax Audio with others? Here's the easy way:
+
+### Creating a DMG
+
+```bash
+# Create a staging folder
+mkdir -p ~/Desktop/CymaxAudio_DMG_Stage
+cp -R "/Applications/CymaxPhoneOutMenubar.app" "~/Desktop/CymaxAudio_DMG_Stage/Cymax Audio.app"
+ln -s /Applications ~/Desktop/CymaxAudio_DMG_Stage/Applications
+
+# Create DMG
+hdiutil create -volname "Cymax Audio" \
+    -srcfolder ~/Desktop/CymaxAudio_DMG_Stage \
+    -ov -format UDZO \
+    ~/Desktop/CymaxAudio.dmg
+```
+
+### What Testers Need to Do
+
+1. Download the DMG
+2. Open it and drag "Cymax Audio" to Applications
+3. **Right-click → Open** (first time only, to bypass Gatekeeper)
+4. Grant Screen Recording permission when prompted
+5. Scan QR code with phone - done!
+
 ## 🔮 Future Improvements
 
 - [ ] USB tethering for lower latency
@@ -178,6 +205,7 @@ Close any extra browser tabs that may have the player open.
 - [ ] Latency display
 - [ ] Multiple simultaneous listeners
 - [ ] Native iOS app option (for background playback)
+- [ ] Code signing & notarization for easier distribution
 
 ## 📊 Technical Notes
 
