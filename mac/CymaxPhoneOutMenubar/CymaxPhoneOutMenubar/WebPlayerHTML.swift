@@ -271,7 +271,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         
         // Target buffer level (samples) - optimized for low latency
         const TARGET_BUFFER_MS = 80;   // Tight: was 85ms
-        const INITIAL_PREBUFFER_MS = 10;  // Instant start on play
+        const INITIAL_PREBUFFER_MS = 5;   // Near-zero latency start
         const REBUFFER_MS = 45;           // Safe recovery after underrun
         let targetBufferSamples = 48000 * 2 * (TARGET_BUFFER_MS / 1000);
         let prebufferSamples = 48000 * 2 * (INITIAL_PREBUFFER_MS / 1000);
