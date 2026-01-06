@@ -117,7 +117,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         .viz-bar {
             width: 8px;
             min-height: 4px;
-            background: linear-gradient(to top, #22c55e, #4ade80);
+            background: linear-gradient(to top, #f5a623, #ffc966);
             border-radius: 2px;
             transition: height 0.05s ease-out;
         }
