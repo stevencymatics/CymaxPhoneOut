@@ -17,7 +17,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cymax Audio</title>
+    <title>Mix Link</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='none' stroke='%2300d4ff' stroke-width='6'/><polygon points='40,30 40,70 72,50' fill='%2300d4ff'/></svg>">
     <style>
         * {
@@ -239,11 +239,53 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
             font-size: 0.7rem;
             cursor: pointer;
         }
+        
+        /* Reconnecting overlay */
+        .reconnect-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s, visibility 0.2s;
+        }
+        
+        .reconnect-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #333;
+            border-top-color: #00d4ff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .reconnect-text {
+            margin-top: 20px;
+            color: #888;
+            font-size: 1rem;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Cymatics <span style="color: #00d4ff;">Link</span></h1>
+        <h1>Mix <span style="color: #00d4ff; font-weight: 700;">Link</span></h1>
         <p class="subtitle">Stream audio from your Mac</p>
         
         <button class="play-button" id="playBtn" onclick="togglePlay()">
@@ -299,6 +341,12 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
     
     <!-- Audio element for output - routes through HTML5 audio to bypass iOS silent mode -->
     <audio id="outputAudio" playsinline style="display:none"></audio>
+    
+    <!-- Reconnecting overlay -->
+    <div class="reconnect-overlay" id="reconnectOverlay">
+        <div class="spinner"></div>
+        <div class="reconnect-text">Reconnecting...</div>
+    </div>
 
     <script>
         const WS_HOST = '\(hostIP)';
@@ -311,6 +359,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         let ws = null;
         let isPlaying = false;
         let packetsReceived = 0;
+        let reconnectAttempts = 0;
         
         // Sample rates - now DYNAMIC based on packet header
         let sourceRate = 48000;     // Will be updated from packet header
@@ -512,6 +561,10 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
                 isPlaying = true;
                 updateStatus('connected', 'Playing');
                 
+                // Setup lock screen controls
+                setupMediaSession();
+                updateMediaSessionState(true);
+                
                 // Start visualizer
                 initVisualizer();
                 animateVisualizer();
@@ -556,6 +609,9 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
             processStartTime = 0;
             totalFramesConsumed = 0;
             
+            // Update lock screen state
+            updateMediaSessionState(false);
+            
             // Reset UI
             updateStatus('', 'Stopped');
             resetVisualizer();
@@ -577,14 +633,28 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
                     debugLog('WebSocket connected!', 'info');
                     document.getElementById('wsStatus').textContent = 'Connected';
                     updateStatus('connected', 'Connected - Waiting for audio');
+                    reconnectAttempts = 0;  // Reset on successful connection
+                    document.getElementById('reconnectOverlay').classList.remove('visible');
                 };
                 
                 ws.onclose = (event) => {
-                    debugLog('WebSocket closed, code: ' + event.code + ', reason: ' + event.reason, 'warn');
+                    debugLog('WebSocket closed, code: ' + event.code, 'warn');
                     document.getElementById('wsStatus').textContent = 'Disconnected';
+                    
                     if (isPlaying) {
-                        updateStatus('connecting', 'Reconnecting...');
-                        setTimeout(connectWebSocket, 1000);
+                        reconnectAttempts++;
+                        if (reconnectAttempts <= 2) {
+                            debugLog('Reconnect attempt ' + reconnectAttempts + '/2...', 'info');
+                            document.getElementById('reconnectOverlay').classList.add('visible');
+                            updateStatus('connecting', 'Reconnecting...');
+                            setTimeout(connectWebSocket, 800);
+                        } else {
+                            // Give up - Mac probably stopped
+                            debugLog('Connection lost - Mac stopped streaming', 'warn');
+                            document.getElementById('reconnectOverlay').classList.remove('visible');
+                            stopAudio();
+                            showError('Connection lost');
+                        }
                     }
                 };
                 
@@ -857,20 +927,44 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
             lastTouchEnd = now;
         }, { passive: false });
         
-        // Simple mute/unmute on tab visibility - keeps audio running in background
-        document.addEventListener('visibilitychange', () => {
-            if (!isPlaying ||!gainNode) return;
-            
-            if (document.visibilityState === 'hidden') {
-                // Tab hidden - just mute (keep everything running)
-                gainNode.gain.value = 0;
-                debugLog('Tab hidden, muted', 'info');
-            } else {
-                // Tab visible - unmute
-                gainNode.gain.value = 1;
-                debugLog('Tab visible, unmuted', 'info');
+        // Media Session API - enables lock screen controls on iOS/Android
+        function setupMediaSession() {
+            if ('mediaSession' in navigator) {
+                navigator.mediaSession.metadata = new MediaMetadata({
+                    title: 'Mix Link',
+                    artist: 'Streaming from Mac',
+                    album: 'System Audio',
+                    artwork: [
+                        { src: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect fill="%23000" width="512" height="512"/><circle cx="256" cy="256" r="180" fill="none" stroke="%2300d4ff" stroke-width="24"/><polygon points="220,160 220,352 360,256" fill="%2300d4ff"/></svg>', sizes: '512x512', type: 'image/svg+xml' }
+                    ]
+                });
+                
+                // Play action - unmute
+                navigator.mediaSession.setActionHandler('play', () => {
+                    debugLog('Media Session: play', 'info');
+                    if (gainNode) gainNode.gain.value = 1;
+                    navigator.mediaSession.playbackState = 'playing';
+                    document.getElementById('playBtn').classList.add('playing');
+                });
+                
+                // Pause action - mute
+                navigator.mediaSession.setActionHandler('pause', () => {
+                    debugLog('Media Session: pause', 'info');
+                    if (gainNode) gainNode.gain.value = 0;
+                    navigator.mediaSession.playbackState = 'paused';
+                    document.getElementById('playBtn').classList.remove('playing');
+                });
+                
+                debugLog('Media Session API configured');
             }
-        });
+        }
+        
+        // Update media session state when playing
+        function updateMediaSessionState(playing) {
+            if ('mediaSession' in navigator) {
+                navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
+            }
+        }
     </script>
 </body>
 </html>
