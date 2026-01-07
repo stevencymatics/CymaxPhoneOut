@@ -294,10 +294,8 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         </div>
     </div>
     
-    <!-- Hidden audio element to enable playback in iOS silent mode - loops to keep session active -->
-    <audio id="silentAudio" playsinline loop style="display:none">
-        <source src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA" type="audio/wav">
-    </audio>
+    <!-- Audio element for output - routes through HTML5 audio to bypass iOS silent mode -->
+    <audio id="outputAudio" playsinline style="display:none"></audio>
 
     <script>
         const WS_HOST = '\(hostIP)';
@@ -306,7 +304,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         let audioContext = null;
         let gainNode = null;
         let scriptNode = null;
-        let keepAliveOsc = null;  // Silent oscillator to keep audio graph alive on iOS
+        let mediaStreamDest = null;  // MediaStream destination for iOS silent mode bypass
         let ws = null;
         let isPlaying = false;
         let packetsReceived = 0;
@@ -447,15 +445,6 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
                 updateStatus('connecting', 'Starting...');
                 debugLog('Starting audio...');
                 
-                // iOS Silent Mode workaround: Play silent audio element first
-                // This helps unlock the audio session for playback mode
-                try {
-                    const silentAudio = document.getElementById('silentAudio');
-                    silentAudio.play().then(() => {
-                        debugLog('Silent audio element playing');
-                    }).catch(() => {});
-                } catch (e) {}
-                
                 // Create audio context (must be after user gesture)
                 // Let browser pick its native rate - we'll resample
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -483,27 +472,30 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
                     document.getElementById('audioState').textContent = audioContext.state;
                 }
                 
+                // Create MediaStream destination - routes audio through HTML5 audio element
+                // This bypasses iOS silent mode because <audio> elements use "playback" category
+                mediaStreamDest = audioContext.createMediaStreamDestination();
+                debugLog('MediaStream destination created');
+                
                 // Create gain node for volume control
                 gainNode = audioContext.createGain();
-                gainNode.connect(audioContext.destination);
-                debugLog('Gain node created and connected');
-                
-                // Create inaudible oscillator to keep iOS in playback mode
-                // Uses 1Hz (below human hearing) at low gain to force audio session active
-                keepAliveOsc = audioContext.createOscillator();
-                keepAliveOsc.frequency.value = 1; // 1Hz - completely inaudible
-                const silentGain = audioContext.createGain();
-                silentGain.gain.value = 0.001; // Very quiet but not zero
-                keepAliveOsc.connect(silentGain);
-                silentGain.connect(audioContext.destination);
-                keepAliveOsc.start();
-                debugLog('Keep-alive oscillator started (1Hz inaudible tone)');
+                gainNode.connect(mediaStreamDest);  // Connect to MediaStream, not destination
+                debugLog('Gain node created and connected to MediaStream');
                 
                 // Create script processor for audio output (smaller buffer = lower latency)
                 scriptNode = audioContext.createScriptProcessor(512, 0, 2);
                 scriptNode.onaudioprocess = processAudio;
                 scriptNode.connect(gainNode);
                 debugLog('Script processor created (buffer: 512 frames, ~11ms)');
+                
+                // Route MediaStream through HTML5 audio element (bypasses iOS silent mode)
+                const outputAudio = document.getElementById('outputAudio');
+                outputAudio.srcObject = mediaStreamDest.stream;
+                outputAudio.play().then(() => {
+                    debugLog('Audio element playing (silent mode bypass active)');
+                }).catch(e => {
+                    debugLog('Audio element play failed: ' + e.message, 'warn');
+                });
                 
                 // Connect WebSocket
                 connectWebSocket();
@@ -525,6 +517,13 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         function stopAudio() {
             debugLog('Stopping audio...');
             
+            // Stop the output audio element
+            try {
+                const outputAudio = document.getElementById('outputAudio');
+                outputAudio.pause();
+                outputAudio.srcObject = null;
+            } catch (e) {}
+            
             if (ws) {
                 ws.close();
                 ws = null;
@@ -534,6 +533,8 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
                 audioContext.close();
                 audioContext = null;
             }
+            
+            mediaStreamDest = null;
             
             isPlaying = false;
             packetsReceived = 0;
@@ -879,6 +880,16 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
                     scriptNode.connect(gainNode);
                     debugLog('ScriptProcessor recreated');
                 }
+                
+                // Restart the output audio element
+                try {
+                    const outputAudio = document.getElementById('outputAudio');
+                    if (mediaStreamDest) {
+                        outputAudio.srcObject = mediaStreamDest.stream;
+                        outputAudio.play().catch(() => {});
+                        debugLog('Output audio element restarted');
+                    }
+                } catch(e) {}
                 
                 // Close existing WebSocket and reconnect
                 if (ws) {
