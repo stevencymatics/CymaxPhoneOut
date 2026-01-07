@@ -18,7 +18,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Cymax Audio</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='none' stroke='%23f5a623' stroke-width='6'/><polygon points='40,30 40,70 72,50' fill='%23f5a623'/></svg>">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='none' stroke='%2300d4ff' stroke-width='6'/><polygon points='40,30 40,70 72,50' fill='%2300d4ff'/></svg>">
     <style>
         * {
             box-sizing: border-box;
@@ -53,39 +53,42 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
             max-width: 100%;
             width: 100%;
             padding: 0 10px;
+            margin-top: -40px;
         }
         
         h1 {
-            font-size: 3rem;
-            margin-bottom: 12px;
+            font-size: 2.2rem;
+            margin-bottom: 8px;
             font-weight: 600;
             color: #fff;
         }
         
         .subtitle {
             color: #888;
-            margin-bottom: 50px;
-            font-size: 1.4rem;
+            margin-bottom: 35px;
+            font-size: 1.2rem;
         }
         
         .play-button {
-            width: 160px;
-            height: 160px;
+            width: 130px;
+            height: 130px;
             border-radius: 50%;
             border: none;
-            background: #f5a623;
+            background: linear-gradient(135deg, #00d4ff 0%, #00ffd4 100%);
             cursor: pointer;
-            margin: 0 auto 25px;
+            margin: 0 auto 15px;
             transition: all 0.2s;
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 0;
+            box-shadow: 0 0 30px rgba(0, 212, 255, 0.4);
         }
         
         .play-button:hover {
-            background: #e6991a;
+            background: linear-gradient(135deg, #00e5ff 0%, #00ffe5 100%);
             transform: scale(1.05);
+            box-shadow: 0 0 40px rgba(0, 212, 255, 0.6);
         }
         
         .play-button:active {
@@ -93,8 +96,8 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         }
         
         .play-button svg {
-            width: 70px;
-            height: 70px;
+            width: 55px;
+            height: 55px;
             fill: #000;
         }
         
@@ -117,19 +120,19 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         /* Visualizer */
         .visualizer-container {
             width: 100%;
-            height: 200px;
-            margin: 20px 0 30px 0;
+            height: 120px;
+            margin: 10px 0 15px 0;
             display: flex;
             align-items: flex-end;
             justify-content: center;
-            gap: 8px;
+            gap: 6px;
         }
         
         .viz-bar {
-            width: 16px;
-            min-height: 8px;
-            background: linear-gradient(to top, #f5a623, #ffc966);
-            border-radius: 4px;
+            width: 14px;
+            min-height: 6px;
+            background: linear-gradient(to top, #00d4ff, #00ffd4);
+            border-radius: 3px;
             transition: height 0.05s ease-out;
         }
         
@@ -177,8 +180,8 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         }
         
         .stats {
-            margin-top: 30px;
-            font-size: 1.4rem;
+            margin-top: 10px;
+            font-size: 1.1rem;
             color: #666;
         }
         
@@ -189,8 +192,8 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         }
         
         .debug-section {
-            margin-top: 40px;
-            padding-top: 20px;
+            margin-top: 15px;
+            padding-top: 10px;
             border-top: 1px solid #222;
         }
         
@@ -240,7 +243,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
 </head>
 <body>
     <div class="container">
-        <h1>Cymatics <span style="color: #f5a623;">Link</span></h1>
+        <h1>Cymatics <span style="color: #00d4ff;">Link</span></h1>
         <p class="subtitle">Stream audio from your Mac</p>
         
         <button class="play-button" id="playBtn" onclick="togglePlay()">
@@ -365,8 +368,8 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         function animateVisualizer() {
             for (let i = 0; i < NUM_BARS; i++) {
                 if (vizBars[i]) {
-                    // Scale to pixel height (8-180px range)
-                    const height = Math.max(8, Math.min(180, vizLevels[i] * 500));
+                    // Scale to pixel height (6-110px range for compact layout)
+                    const height = Math.max(6, Math.min(110, vizLevels[i] * 400));
                     vizBars[i].style.height = height + 'px';
                 }
             }
@@ -379,7 +382,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
             vizLevels.fill(0);
             for (let i = 0; i < NUM_BARS; i++) {
                 if (vizBars[i]) {
-                    vizBars[i].style.height = '8px';
+                    vizBars[i].style.height = '6px';
                 }
             }
             if (vizAnimFrame) {
@@ -467,8 +470,14 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
                 // Resume if suspended (iOS requirement)
                 if (audioContext.state === 'suspended') {
                     debugLog('Resuming suspended AudioContext...');
-                    await audioContext.resume();
-                    debugLog('AudioContext resumed, state: ' + audioContext.state);
+                    
+                    // Use timeout - iOS can hang indefinitely without user gesture
+                    const resumePromise = audioContext.resume();
+                    const timeoutPromise = new Promise(resolve => setTimeout(resolve, 300));
+                    
+                    await Promise.race([resumePromise, timeoutPromise]);
+                    
+                    debugLog('AudioContext state after resume: ' + audioContext.state);
                     document.getElementById('audioState').textContent = audioContext.state;
                 }
                 
@@ -848,82 +857,18 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
             lastTouchEnd = now;
         }, { passive: false });
         
-        // Pause when tab hidden, resume when visible
-        document.addEventListener('visibilitychange', async () => {
-            if (document.visibilityState === 'hidden' && isPlaying) {
-                // Tab became hidden - pause audio
-                debugLog('Tab hidden, pausing audio...', 'info');
-                
-                try {
-                    const outputAudio = document.getElementById('outputAudio');
-                    outputAudio.pause();
-                } catch(e) {}
-                
-                if (audioContext && audioContext.state === 'running') {
-                    try {
-                        await audioContext.suspend();
-                        debugLog('AudioContext suspended');
-                    } catch(e) {}
-                }
-            }
-            else if (document.visibilityState === 'visible' && isPlaying) {
-                // Tab became visible - resume audio
-                debugLog('Tab visible, resuming audio...', 'info');
-                
-                // Resume AudioContext
-                if (audioContext && audioContext.state === 'suspended') {
-                    try {
-                        await audioContext.resume();
-                        debugLog('AudioContext resumed: ' + audioContext.state);
-                    } catch (e) {
-                        debugLog('Audio resume failed: ' + e.message, 'error');
-                    }
-                }
-                
-                // Recreate ScriptProcessor (it freezes when backgrounded)
-                if (scriptNode && audioContext) {
-                    debugLog('Recreating ScriptProcessor...', 'info');
-                    try { scriptNode.disconnect(); } catch(e) {}
-                    scriptNode = audioContext.createScriptProcessor(512, 0, 2);
-                    scriptNode.onaudioprocess = processAudio;
-                    scriptNode.connect(gainNode);
-                    debugLog('ScriptProcessor recreated');
-                }
-                
-                // Resume the output audio element
-                try {
-                    const outputAudio = document.getElementById('outputAudio');
-                    if (mediaStreamDest) {
-                        outputAudio.srcObject = mediaStreamDest.stream;
-                        outputAudio.play().catch(() => {});
-                        debugLog('Output audio element resumed');
-                    }
-                } catch(e) {}
-                
-                // Reconnect WebSocket if needed
-                if (!ws || ws.readyState !== WebSocket.OPEN) {
-                    if (ws) {
-                        ws.onclose = null;
-                        ws.onerror = null;
-                        ws.onmessage = null;
-                        try { ws.close(); } catch(e) {}
-                        ws = null;
-                    }
-                    
-                    // Clear stale buffer data
-                    bufferedSamples = 0;
-                    writePos = 0;
-                    readPos = 0;
-                    isPrebuffering = true;
-                    isInitialStart = true;
-                    packetsReceived = 0;
-                    
-                    await new Promise(resolve => setTimeout(resolve, 200));
-                    debugLog('Reconnecting WebSocket...', 'info');
-                    connectWebSocket();
-                }
-                
-                updateStatus('connected', 'Resumed');
+        // Simple mute/unmute on tab visibility - keeps audio running in background
+        document.addEventListener('visibilitychange', () => {
+            if (!isPlaying ||!gainNode) return;
+            
+            if (document.visibilityState === 'hidden') {
+                // Tab hidden - just mute (keep everything running)
+                gainNode.gain.value = 0;
+                debugLog('Tab hidden, muted', 'info');
+            } else {
+                // Tab visible - unmute
+                gainNode.gain.value = 1;
+                debugLog('Tab visible, unmuted', 'info');
             }
         });
     </script>
