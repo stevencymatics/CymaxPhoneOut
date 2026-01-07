@@ -848,30 +848,39 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
             lastTouchEnd = now;
         }, { passive: false });
         
-        // Auto-reconnect when tab becomes visible again (mobile browsers suspend connections)
+        // Pause when tab hidden, resume when visible
         document.addEventListener('visibilitychange', async () => {
-            if (document.visibilityState === 'visible' && isPlaying) {
-                debugLog('Tab became visible, reconnecting...', 'info');
+            if (document.visibilityState === 'hidden' && isPlaying) {
+                // Tab became hidden - pause audio
+                debugLog('Tab hidden, pausing audio...', 'info');
                 
-                // Mobile browsers freeze the ScriptProcessor when backgrounded.
-                // Force suspend/resume cycle to wake up audio graph
+                try {
+                    const outputAudio = document.getElementById('outputAudio');
+                    outputAudio.pause();
+                } catch(e) {}
                 
-                if (audioContext) {
-                    debugLog('AudioContext state: ' + audioContext.state, 'info');
-                    
-                    // Force suspend then resume to restart audio graph
+                if (audioContext && audioContext.state === 'running') {
                     try {
-                        debugLog('Forcing audio restart...', 'info');
                         await audioContext.suspend();
-                        await new Promise(r => setTimeout(r, 50));
+                        debugLog('AudioContext suspended');
+                    } catch(e) {}
+                }
+            }
+            else if (document.visibilityState === 'visible' && isPlaying) {
+                // Tab became visible - resume audio
+                debugLog('Tab visible, resuming audio...', 'info');
+                
+                // Resume AudioContext
+                if (audioContext && audioContext.state === 'suspended') {
+                    try {
                         await audioContext.resume();
-                        debugLog('AudioContext restarted: ' + audioContext.state);
+                        debugLog('AudioContext resumed: ' + audioContext.state);
                     } catch (e) {
-                        debugLog('Audio restart failed: ' + e.message, 'error');
+                        debugLog('Audio resume failed: ' + e.message, 'error');
                     }
                 }
                 
-                // Disconnect and recreate ScriptProcessor (it freezes when backgrounded)
+                // Recreate ScriptProcessor (it freezes when backgrounded)
                 if (scriptNode && audioContext) {
                     debugLog('Recreating ScriptProcessor...', 'info');
                     try { scriptNode.disconnect(); } catch(e) {}
@@ -881,39 +890,40 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
                     debugLog('ScriptProcessor recreated');
                 }
                 
-                // Restart the output audio element
+                // Resume the output audio element
                 try {
                     const outputAudio = document.getElementById('outputAudio');
                     if (mediaStreamDest) {
                         outputAudio.srcObject = mediaStreamDest.stream;
                         outputAudio.play().catch(() => {});
-                        debugLog('Output audio element restarted');
+                        debugLog('Output audio element resumed');
                     }
                 } catch(e) {}
                 
-                // Close existing WebSocket and reconnect
-                if (ws) {
-                    ws.onclose = null;
-                    ws.onerror = null;
-                    ws.onmessage = null;
-                    try { ws.close(); } catch(e) {}
-                    ws = null;
+                // Reconnect WebSocket if needed
+                if (!ws || ws.readyState !== WebSocket.OPEN) {
+                    if (ws) {
+                        ws.onclose = null;
+                        ws.onerror = null;
+                        ws.onmessage = null;
+                        try { ws.close(); } catch(e) {}
+                        ws = null;
+                    }
+                    
+                    // Clear stale buffer data
+                    bufferedSamples = 0;
+                    writePos = 0;
+                    readPos = 0;
+                    isPrebuffering = true;
+                    isInitialStart = true;
+                    packetsReceived = 0;
+                    
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                    debugLog('Reconnecting WebSocket...', 'info');
+                    connectWebSocket();
                 }
                 
-                // Clear stale buffer data
-                bufferedSamples = 0;
-                writePos = 0;
-                readPos = 0;
-                isPrebuffering = true;
-                isInitialStart = true;
-                packetsReceived = 0;
-                
-                // Wait a moment then reconnect WebSocket
-                await new Promise(resolve => setTimeout(resolve, 200));
-                debugLog('Reconnecting WebSocket...', 'info');
-                connectWebSocket();
-                
-                updateStatus('connected', 'Reconnected');
+                updateStatus('connected', 'Resumed');
             }
         });
     </script>
