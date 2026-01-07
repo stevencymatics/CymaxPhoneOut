@@ -1,6 +1,6 @@
 # Quick Start Guide
 
-Get Cymax Audio running in under 2 minutes!
+Get Mix Link running in under 2 minutes!
 
 ## Prerequisites
 
@@ -71,8 +71,10 @@ Right-click the app → Open → Open
 
 ## Tips
 
-- **Keep your phone's screen on** while streaming (or audio may pause)
-- **Buffer of 150-250ms** is normal and provides smooth playback
+- **Silent mode works!** - Audio plays even when iPhone mute switch is on
+- **Lock screen controls** - Play/pause from lock screen or Control Center
+- **Screen can turn off** - Audio continues playing when screen locks
+- **Buffer of 50-150ms** is normal and provides smooth playback
 - **Close other browser tabs** playing audio on your phone
 
 ## Need More Help?

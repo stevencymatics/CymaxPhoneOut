@@ -1,4 +1,4 @@
-# Cymax Phone Out - macOS to iPhone Audio Streaming
+# Mix Link - macOS to iPhone Audio Streaming
 
 Stream system audio from your Mac to your iPhone in real-time over WiFi. **No app install required on your phone** - just scan a QR code and listen!
 
@@ -8,8 +8,10 @@ Stream system audio from your Mac to your iPhone in real-time over WiFi. **No ap
 - **No audio output switching required** - works with your existing speakers/headphones
 - **No iPhone app needed** - uses your phone's web browser
 - **QR code connection** - scan and play in seconds
+- **Works with iPhone silent mode** - audio plays even when muted
+- **Lock screen controls** - play/pause from iOS lock screen
 - Works with any audio source: Apple Music, Spotify, YouTube, **FL Studio**, Logic Pro, etc.
-- ~200-300ms latency over WiFi
+- ~80-150ms latency over WiFi
 
 ## ✨ Key Features
 
@@ -19,6 +21,8 @@ Stream system audio from your Mac to your iPhone in real-time over WiFi. **No ap
 | 📱 No App Required | Phone uses web browser (Chrome/Safari) |
 | 📷 QR Code Setup | Instant connection - just scan and tap play |
 | 🎵 48kHz Stereo | High-quality Float32 audio streaming |
+| 🔇 Silent Mode Support | Bypasses iPhone mute switch |
+| 🔒 Lock Screen Controls | Play/pause from iOS lock screen & Control Center |
 | 🔄 Auto-Reconnect | Handles network interruptions gracefully |
 
 ## 🚀 Quick Start
@@ -173,27 +177,12 @@ Close any extra browser tabs that may have the player open.
 
 ## 📦 Distribution (For Testers)
 
-Want to share Cymax Audio with others? Here's the easy way:
-
-### Creating a DMG
-
-```bash
-# Create a staging folder
-mkdir -p ~/Desktop/CymaxAudio_DMG_Stage
-cp -R "/Applications/CymaxPhoneOutMenubar.app" "~/Desktop/CymaxAudio_DMG_Stage/Cymax Audio.app"
-ln -s /Applications ~/Desktop/CymaxAudio_DMG_Stage/Applications
-
-# Create DMG
-hdiutil create -volname "Cymax Audio" \
-    -srcfolder ~/Desktop/CymaxAudio_DMG_Stage \
-    -ov -format UDZO \
-    ~/Desktop/CymaxAudio.dmg
-```
+Want to share Mix Link with others? A pre-built DMG is included in the repo: `CymaxLink.dmg`
 
 ### What Testers Need to Do
 
-1. Download the DMG
-2. Open it and drag "Cymax Audio" to Applications
+1. Download `CymaxLink.dmg`
+2. Open it and drag the app to Applications
 3. **Right-click → Open** (first time only, to bypass Gatekeeper)
 4. Grant Screen Recording permission when prompted
 5. Scan QR code with phone - done!
@@ -204,7 +193,7 @@ hdiutil create -volname "Cymax Audio" \
 - [ ] Volume control in web player
 - [ ] Latency display
 - [ ] Multiple simultaneous listeners
-- [ ] Native iOS app option (for background playback)
+- [x] ~~Native iOS app option (for background playback)~~ - Solved with lock screen controls!
 - [ ] Code signing & notarization for easier distribution
 
 ## 📊 Technical Notes
