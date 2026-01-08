@@ -50,20 +50,144 @@ class AppState: ObservableObject {
     
     // Services
     private var audioCapture: SystemAudioCapture?
-    private var webSocketServer: WebSocketServer?
-    private var httpServer: HTTPServer?
+    private var httpServer: HTTPServer?  // Combined HTTP + WebSocket server
     
     // Audio packet building
     private var sequenceNumber: UInt32 = 0
     
-    // Ports
-    private let httpPort: UInt16 = 19621  // Unique port to avoid conflicts with other dev servers
-    private let wsPort: UInt16 = 19622
+    // Ports - now using single port for both HTTP and WebSocket (Safari compatibility)
+    private let httpPort: UInt16 = 19621
+    
+    // Sleep/wake handling
+    private var sleepObserver: NSObjectProtocol?
+    private var wakeObserver: NSObjectProtocol?
+    private var wasRunningBeforeSleep = false
+    
+    // Health check
+    private var healthCheckTimer: Timer?
+    private var lastPacketCount: Int = 0
+    private var stalePacketCheckCount: Int = 0
     
     init() {
-        log("Cymax Audio started")
+        log("Mix Link started")
         log("Ready to stream system audio to your phone")
         updateQRCode()
+        setupSleepWakeObservers()
+    }
+    
+    private func setupSleepWakeObservers() {
+        // Observe when Mac is about to sleep
+        sleepObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.willSleepNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.handleSleep()
+            }
+        }
+        
+        // Observe when Mac wakes up
+        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.handleWake()
+            }
+        }
+    }
+    
+    private func handleSleep() {
+        log("Mac going to sleep...", level: .info)
+        wasRunningBeforeSleep = isServerRunning
+        if isServerRunning {
+            stopServer()
+            log("Servers stopped for sleep", level: .info)
+        }
+    }
+    
+    private func handleWake() {
+        log("Mac woke up", level: .info)
+        if wasRunningBeforeSleep {
+            // Small delay to let network come back up
+            Task {
+                try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+                await MainActor.run {
+                    self.log("Auto-restarting servers...", level: .info)
+                    self.startServer()
+                }
+            }
+        }
+    }
+    
+    deinit {
+        if let observer = sleepObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+        }
+        if let observer = wakeObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+        }
+        healthCheckTimer?.invalidate()
+    }
+    
+    // MARK: - Health Check
+    
+    private func startHealthCheck() {
+        lastPacketCount = 0
+        stalePacketCheckCount = 0
+        
+        healthCheckTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.performHealthCheck()
+            }
+        }
+    }
+    
+    private func stopHealthCheck() {
+        healthCheckTimer?.invalidate()
+        healthCheckTimer = nil
+    }
+    
+    private func performHealthCheck() {
+        guard isServerRunning else { return }
+        
+        // Check if audio capture is still working
+        if isCaptureActive && webClientsConnected > 0 {
+            // If we have clients but packets aren't increasing, something's wrong
+            if packetsSent == lastPacketCount {
+                stalePacketCheckCount += 1
+                
+                if stalePacketCheckCount >= 3 {
+                    // 15 seconds of no new packets with active clients - restart
+                    log("Audio capture appears stalled, restarting...", level: .warning)
+                    restartAudioCapture()
+                    stalePacketCheckCount = 0
+                }
+            } else {
+                stalePacketCheckCount = 0
+            }
+            lastPacketCount = packetsSent
+        }
+        
+        // Check if capture died
+        if !isCaptureActive && isServerRunning && !needsPermission {
+            log("Audio capture stopped unexpectedly, restarting...", level: .warning)
+            startAudioCapture()
+        }
+    }
+    
+    private func restartAudioCapture() {
+        stopAudioCapture()
+        
+        // Brief delay before restarting
+        Task {
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            await MainActor.run {
+                self.startAudioCapture()
+            }
+        }
     }
     
     // MARK: - Server Control
@@ -71,7 +195,7 @@ class AppState: ObservableObject {
     func startServer() {
         guard !isServerRunning else { return }
         
-        log("Starting servers...")
+        log("Starting server...")
         
         // Get local IP
         guard let localIP = QRCodeGenerator.getLocalIPAddress() else {
@@ -80,23 +204,21 @@ class AppState: ObservableObject {
             return
         }
         
-        // Start WebSocket server
-        webSocketServer = WebSocketServer(port: wsPort)
-        webSocketServer?.onClientCountChanged = { [weak self] count in
+        // Get Mac's computer name
+        let hostName = Host.current().localizedName ?? "Mac"
+        
+        // Generate HTML with same port for WebSocket (Safari compatibility)
+        let htmlContent = getWebPlayerHTML(wsPort: httpPort, hostIP: localIP, hostName: hostName)
+        
+        // Start combined HTTP + WebSocket server (same port for Safari)
+        httpServer = HTTPServer(port: httpPort)
+        httpServer?.htmlContent = htmlContent
+        httpServer?.onClientCountChanged = { [weak self] count in
             Task { @MainActor in
                 self?.webClientsConnected = count
                 self?.log("Browser clients: \(count)")
             }
         }
-        webSocketServer?.start()
-        
-        // Generate HTML with correct IP
-        let htmlContent = getWebPlayerHTML(wsPort: wsPort, hostIP: localIP)
-        
-        // Start HTTP server
-        httpServer = HTTPServer(port: httpPort)
-        httpServer?.htmlContent = htmlContent
-        httpServer?.webSocketPort = wsPort
         httpServer?.start()
         
         isServerRunning = true
@@ -105,23 +227,26 @@ class AppState: ObservableObject {
         // Generate QR code
         updateQRCode()
         
-        log("Servers started!")
+        log("Server started!")
         log("URL: \(webPlayerURL ?? "unknown")")
         
         // Start audio capture
         startAudioCapture()
+        
+        // Start health check timer
+        startHealthCheck()
     }
     
     func stopServer() {
         guard isServerRunning else { return }
         
-        log("Stopping servers...")
+        log("Stopping server...")
+        
+        // Stop health check
+        stopHealthCheck()
         
         // Stop audio capture
         stopAudioCapture()
-        
-        webSocketServer?.stop()
-        webSocketServer = nil
         
         httpServer?.stop()
         httpServer = nil
@@ -130,7 +255,7 @@ class AppState: ObservableObject {
         webClientsConnected = 0
         packetsSent = 0
         
-        log("Servers stopped")
+        log("Server stopped")
     }
     
     // MARK: - Audio Capture
@@ -252,8 +377,8 @@ class AppState: ObservableObject {
     
     /// Process audio in background to avoid main thread congestion
     private func processAudioInBackground(_ samples: [Float], sampleRate: Int, channels: Int) {
-        // Capture what we need
-        let server = webSocketServer
+        // Capture what we need - now using combined HTTP+WebSocket server
+        let server = httpServer
         let clientCount = webClientsConnected
         
         guard clientCount > 0 else { return }
@@ -337,7 +462,7 @@ private var gStartTime: CFAbsoluteTime = 0
 private let gAudioQueue = DispatchQueue(label: "com.cymax.audioprocessing", qos: .userInteractive)
 
 /// Processes audio on a background queue - completely avoids Swift actor system
-func processAudioGlobally(samples: [Float], sampleRate: Int, channels: Int, server: WebSocketServer?, onPacketCount: @escaping @Sendable (Int) -> Void) {
+func processAudioGlobally(samples: [Float], sampleRate: Int, channels: Int, server: HTTPServer?, onPacketCount: @escaping @Sendable (Int) -> Void) {
     // Capture everything we need as values
     let samplesCopy = samples
     let sr = sampleRate

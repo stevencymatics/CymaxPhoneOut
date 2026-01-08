@@ -10,7 +10,8 @@ import Foundation
 /// Returns the HTML content for the web audio player
 /// - Parameter wsPort: WebSocket port to connect to
 /// - Parameter hostIP: IP address of the Mac
-func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
+/// - Parameter hostName: Name of the Mac (e.g. "Steven's MacBook Pro")
+func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> String {
     return """
 <!DOCTYPE html>
 <html lang="en">
@@ -286,7 +287,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
 <body>
     <div class="container">
         <h1>Mix <span style="color: #00d4ff; font-weight: 700;">Link</span></h1>
-        <p class="subtitle">Stream audio from your Mac</p>
+        <p class="subtitle" id="subtitle">Stream audio from your Computer.</p>
         
         <button class="play-button" id="playBtn" onclick="togglePlay()">
             <svg class="play-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -351,6 +352,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
     <script>
         const WS_HOST = '\(hostIP)';
         const WS_PORT = \(wsPort);
+        const HOST_NAME = '\(hostName)';
         
         let audioContext = null;
         let gainNode = null;
@@ -478,6 +480,20 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
             }
         }
         
+        function updateSubtitle(connected, customMessage) {
+            const subtitle = document.getElementById('subtitle');
+            if (connected) {
+                // Connected icon (link/chain symbol)
+                const connectedIcon = '<svg style="width:14px;height:14px;vertical-align:middle;margin-right:6px;" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>';
+                subtitle.innerHTML = connectedIcon + 'Connected to <span style="color: #fff; font-weight: 600;">' + HOST_NAME + '</span>';
+            } else {
+                // Disconnected icon (wifi off / signal lost)
+                const disconnectedIcon = '<svg style="width:14px;height:14px;vertical-align:middle;margin-right:6px;" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><line x1="8" y1="8" x2="16" y2="16"/></svg>';
+                const message = customMessage || 'Not connected to a computer.';
+                subtitle.innerHTML = disconnectedIcon + message;
+            }
+        }
+        
         function showError(msg) {
             document.getElementById('errorMsg').textContent = msg;
             debugLog(msg, 'error');
@@ -586,9 +602,24 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
                 outputAudio.srcObject = null;
             } catch (e) {}
             
+            // Close WebSocket if open
             if (ws) {
                 ws.close();
                 ws = null;
+            }
+            
+            // Cancel HTTP stream if active
+            if (httpWatchdog) {
+                clearInterval(httpWatchdog);
+                httpWatchdog = null;
+            }
+            if (httpStreamController) {
+                httpStreamController.abort();
+                httpStreamController = null;
+            }
+            if (httpStreamReader) {
+                try { httpStreamReader.cancel(); } catch (e) {}
+                httpStreamReader = null;
             }
             
             if (audioContext) {
@@ -614,52 +645,127 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
             
             // Reset UI
             updateStatus('', 'Stopped');
+            updateSubtitle(false);
             resetVisualizer();
             document.getElementById('wsStatus').textContent = 'Not connected';
             document.getElementById('audioState').textContent = 'Stopped';
             debugLog('Audio stopped');
         }
         
-        function connectWebSocket() {
+        let wsConnectionTimeout = null;
+        let networkWarmedUp = false;
+        
+        // Safari needs HTTP request first to trigger local network permission
+        async function warmUpNetwork() {
+            if (networkWarmedUp) {
+                debugLog('Network already warmed up, skipping');
+                return true;
+            }
+            
+            const httpUrl = 'http://' + WS_HOST + ':19621/health';
+            debugLog('🌐 Network warmup: fetching ' + httpUrl);
+            const warmupStart = Date.now();
+            
+            try {
+                const response = await fetch(httpUrl, { 
+                    method: 'GET',
+                    cache: 'no-store'
+                });
+                const elapsed = Date.now() - warmupStart;
+                networkWarmedUp = true;
+                debugLog('🌐 Network warmup SUCCESS in ' + elapsed + 'ms (status: ' + response.status + ')');
+                return true;
+            } catch (err) {
+                const elapsed = Date.now() - warmupStart;
+                debugLog('🌐 Network warmup FAILED in ' + elapsed + 'ms: ' + err.message, 'warn');
+                // Try WebSocket anyway - might still work
+                return true;
+            }
+        }
+        
+        let httpStreamReader = null;
+        let httpStreamController = null;
+        
+        // Detect Safari (iOS Safari specifically has WebSocket issues with local network)
+        const isSafari = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
+        const isIOSSafari = isSafari && /iPhone|iPad|iPod/.test(navigator.userAgent);
+        
+        async function connectWebSocket() {
+            // Warm up network
+            await warmUpNetwork();
+            
+            const startTime = Date.now();
+            
+            // iOS Safari: ALWAYS use HTTP stream (WebSocket to local IPs is unreliable)
+            if (isIOSSafari) {
+                debugLog('📱 iOS Safari detected - using HTTP stream', 'info');
+                connectHTTPStream();
+                return;
+            }
+            
             const url = 'ws://' + WS_HOST + ':' + WS_PORT;
-            debugLog('Connecting to WebSocket: ' + url);
+            
+            debugLog('=== CONNECTION ATTEMPT ===');
+            debugLog('URL: ' + url);
+            debugLog('Browser: ' + (isSafari ? 'Safari' : 'Chrome/Other'));
+            debugLog('User-Agent: ' + navigator.userAgent.substring(0, 80));
+            debugLog('Online: ' + navigator.onLine);
+            debugLog('Attempt #' + (reconnectAttempts + 1));
             document.getElementById('wsStatus').textContent = 'Connecting...';
             
             try {
+                debugLog('Creating WebSocket object...');
                 ws = new WebSocket(url);
                 ws.binaryType = 'arraybuffer';
+                debugLog('WebSocket created in ' + (Date.now() - startTime) + 'ms, readyState: ' + ws.readyState);
+                
+                // Timeout for connection - 2s for Safari (faster fallback), 4s for others
+                const timeout = isSafari ? 2000 : 4000;
+                wsConnectionTimeout = setTimeout(() => {
+                    if (ws && ws.readyState === 0) {
+                        const elapsed = Date.now() - startTime;
+                        debugLog('⏱️ TIMEOUT after ' + elapsed + 'ms (readyState still 0)', 'warn');
+                        ws.close();
+                    }
+                }, timeout);
                 
                 ws.onopen = () => {
-                    debugLog('WebSocket connected!', 'info');
-                    document.getElementById('wsStatus').textContent = 'Connected';
+                    clearTimeout(wsConnectionTimeout);
+                    const elapsed = Date.now() - startTime;
+                    debugLog('✅ WebSocket CONNECTED in ' + elapsed + 'ms!', 'info');
+                    document.getElementById('wsStatus').textContent = 'Connected (WebSocket)';
                     updateStatus('connected', 'Connected - Waiting for audio');
-                    reconnectAttempts = 0;  // Reset on successful connection
+                    updateSubtitle(true);
+                    reconnectAttempts = 0;
+                    useHTTPFallback = false;
                     document.getElementById('reconnectOverlay').classList.remove('visible');
                 };
                 
                 ws.onclose = (event) => {
-                    debugLog('WebSocket closed, code: ' + event.code, 'warn');
+                    clearTimeout(wsConnectionTimeout);
+                    const elapsed = Date.now() - startTime;
+                    debugLog('❌ CLOSED after ' + elapsed + 'ms - code: ' + event.code + ', wasClean: ' + event.wasClean, 'warn');
                     document.getElementById('wsStatus').textContent = 'Disconnected';
                     
                     if (isPlaying) {
                         reconnectAttempts++;
                         if (reconnectAttempts <= 2) {
-                            debugLog('Reconnect attempt ' + reconnectAttempts + '/2...', 'info');
+                            debugLog('🔄 Reconnect ' + reconnectAttempts + '/2...', 'info');
                             document.getElementById('reconnectOverlay').classList.add('visible');
                             updateStatus('connecting', 'Reconnecting...');
-                            setTimeout(connectWebSocket, 800);
+                            setTimeout(connectWebSocket, 1000);
                         } else {
-                            // Give up - Mac probably stopped
-                            debugLog('Connection lost - Mac stopped streaming', 'warn');
+                            debugLog('💀 No connection found', 'warn');
                             document.getElementById('reconnectOverlay').classList.remove('visible');
+                            updateSubtitle(false, 'No connection found. Please check computer.');
                             stopAudio();
-                            showError('Connection lost');
                         }
                     }
                 };
                 
                 ws.onerror = (err) => {
-                    debugLog('WebSocket error: ' + JSON.stringify(err), 'error');
+                    const elapsed = Date.now() - startTime;
+                    debugLog('⚠️ ERROR after ' + elapsed + 'ms - readyState: ' + (ws ? ws.readyState : 'null'), 'error');
                     document.getElementById('wsStatus').textContent = 'Error';
                     updateStatus('error', 'Connection error');
                 };
@@ -668,7 +774,146 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
                     handleAudioPacket(event.data);
                 };
             } catch (err) {
-                debugLog('WebSocket creation error: ' + err.message, 'error');
+                debugLog('💥 WebSocket creation EXCEPTION: ' + err.message, 'error');
+            }
+        }
+        
+        // HTTP streaming for Safari (more reliable than WebSocket on local network)
+        let httpWatchdog = null;
+        let lastPacketTime = 0;
+        
+        async function connectHTTPStream() {
+            // Clean up any existing reader and watchdog
+            if (httpStreamReader) {
+                try {
+                    await httpStreamReader.cancel();
+                } catch (e) {}
+                httpStreamReader = null;
+            }
+            if (httpWatchdog) {
+                clearInterval(httpWatchdog);
+                httpWatchdog = null;
+            }
+            
+            const url = 'http://' + WS_HOST + ':' + WS_PORT + '/stream';
+            debugLog('=== HTTP STREAM ===');
+            debugLog('URL: ' + url);
+            document.getElementById('wsStatus').textContent = 'Connecting...';
+            
+            try {
+                const controller = new AbortController();
+                httpStreamController = controller;
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    cache: 'no-store',
+                    signal: controller.signal
+                });
+                
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+                
+                debugLog('✅ HTTP stream connected!', 'info');
+                document.getElementById('wsStatus').textContent = 'Connected';
+                updateStatus('connected', 'Connected - Waiting for audio');
+                updateSubtitle(true);
+                reconnectAttempts = 0;
+                document.getElementById('reconnectOverlay').classList.remove('visible');
+                lastPacketTime = Date.now();
+                
+                // Watchdog: detect if stream goes stale (no data for 2 seconds)
+                httpWatchdog = setInterval(() => {
+                    const staleDuration = Date.now() - lastPacketTime;
+                    
+                    // Show spinner immediately when stale (after 1 second of no data)
+                    if (isPlaying && staleDuration > 1000) {
+                        document.getElementById('reconnectOverlay').classList.add('visible');
+                        updateStatus('connecting', 'Reconnecting...');
+                    }
+                    
+                    // After 2 seconds of no data, trigger reconnect
+                    if (isPlaying && staleDuration > 2000) {
+                        debugLog('⚠️ Stream stale - no data for 2s', 'warn');
+                        clearInterval(httpWatchdog);
+                        httpWatchdog = null;
+                        if (httpStreamController) {
+                            httpStreamController.abort();
+                        }
+                        handleStreamDisconnect();
+                    }
+                }, 500);
+                
+                // Read the stream
+                const reader = response.body.getReader();
+                httpStreamReader = reader;
+                let buffer = new Uint8Array(0);
+                
+                while (isPlaying) {
+                    const { done, value } = await reader.read();
+                    if (done) {
+                        debugLog('HTTP stream ended', 'warn');
+                        break;
+                    }
+                    
+                    lastPacketTime = Date.now();
+                    
+                    // Accumulate data
+                    const newBuffer = new Uint8Array(buffer.length + value.length);
+                    newBuffer.set(buffer);
+                    newBuffer.set(value, buffer.length);
+                    buffer = newBuffer;
+                    
+                    // Process complete packets
+                    while (buffer.length >= 16) {
+                        const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.length);
+                        const frameCount = view.getUint16(14, true);
+                        const channels = view.getUint16(12, true);
+                        const packetSize = 16 + (frameCount * channels * 4);
+                        
+                        if (buffer.length >= packetSize) {
+                            const packetData = new ArrayBuffer(packetSize);
+                            new Uint8Array(packetData).set(buffer.subarray(0, packetSize));
+                            handleAudioPacket(packetData);
+                            buffer = buffer.slice(packetSize);
+                        } else {
+                            break;
+                        }
+                    }
+                }
+                
+                // Stream ended normally
+                handleStreamDisconnect();
+                
+            } catch (err) {
+                if (err.name === 'AbortError') {
+                    debugLog('HTTP stream aborted', 'info');
+                    return;
+                }
+                debugLog('HTTP stream error: ' + err.message, 'error');
+                handleStreamDisconnect();
+            }
+        }
+        
+        function handleStreamDisconnect() {
+            if (httpWatchdog) {
+                clearInterval(httpWatchdog);
+                httpWatchdog = null;
+            }
+            
+            if (isPlaying) {
+                reconnectAttempts++;
+                if (reconnectAttempts <= 2) {
+                    debugLog('🔄 Reconnect ' + reconnectAttempts + '/2...', 'info');
+                    document.getElementById('reconnectOverlay').classList.add('visible');
+                    updateStatus('connecting', 'Reconnecting...');
+                    setTimeout(connectHTTPStream, 1000);
+                } else {
+                    debugLog('💀 No connection found', 'warn');
+                    document.getElementById('reconnectOverlay').classList.remove('visible');
+                    updateSubtitle(false, 'No connection found. Please check computer.');
+                    stopAudio();
+                }
             }
         }
         
@@ -812,7 +1057,8 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
                         outputL[i] = 0;
                         outputR[i] = 0;
                     }
-                    if (packetsReceived % 50 === 0) {
+                    // Only log prebuffer status once per second (not every callback)
+                    if (packetsReceived > 0 && packetsReceived % 200 === 0) {
                         const pct = Math.round((bufferedSamples / currentThreshold) * 100);
                         const mode = isInitialStart ? 'Starting' : 'Rebuffering';
                         debugLog(mode + ': ' + pct + '% (' + Math.round(bufferedSamples/2/outputRate*1000) + 'ms)');
@@ -908,6 +1154,19 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String) -> String {
         // Initial log
         debugLog('Cymax Audio Web Player loaded');
         debugLog('Will connect to ws://' + WS_HOST + ':' + WS_PORT);
+        
+        // Tab visibility - mute when hidden, unmute when visible
+        document.addEventListener('visibilitychange', () => {
+            if (!isPlaying || !gainNode) return;
+            
+            if (document.hidden) {
+                debugLog('Tab hidden - muting audio');
+                gainNode.gain.value = 0;
+            } else {
+                debugLog('Tab visible - unmuting audio');
+                gainNode.gain.value = 1;
+            }
+        });
         
         // Prevent screen sleep on mobile
         if ('wakeLock' in navigator) {

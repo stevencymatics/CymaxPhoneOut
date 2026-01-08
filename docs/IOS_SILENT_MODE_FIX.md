@@ -88,3 +88,23 @@ outputAudio.pause();
 outputAudio.srcObject = null;
 ```
 
+## Tab Visibility - Mute/Unmute
+
+To mute audio when the user switches tabs (and unmute when they return), use the `visibilitychange` event:
+
+```javascript
+document.addEventListener('visibilitychange', () => {
+    if (!isPlaying || !gainNode) return;
+    
+    if (document.hidden) {
+        // Tab hidden - mute
+        gainNode.gain.value = 0;
+    } else {
+        // Tab visible - unmute
+        gainNode.gain.value = 1;
+    }
+});
+```
+
+This keeps the audio stream running (important for background playback and lock screen controls) but silences the output when the user isn't actively viewing the page.
+

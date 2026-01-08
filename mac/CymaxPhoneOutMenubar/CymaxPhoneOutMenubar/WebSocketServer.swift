@@ -17,6 +17,12 @@ class WebSocketServer {
     private let connectionsLock = NSLock()
     
     private var isRunning = false
+    private var connectionAttempts = 0
+    
+    private func log(_ message: String) {
+        let timestamp = ISO8601DateFormatter().string(from: Date())
+        print("[\(timestamp)] WS: \(message)")
+    }
     
     // Stats
     var connectedClients: Int {
@@ -55,19 +61,25 @@ class WebSocketServer {
             listener?.stateUpdateHandler = { [weak self] state in
                 switch state {
                 case .ready:
-                    print("WebSocketServer: Listening on port \(self?.port ?? 0)")
+                    self?.log("✅ LISTENING on port \(self?.port ?? 0)")
+                case .waiting(let error):
+                    self?.log("⏳ Waiting - \(error)")
                 case .failed(let error):
-                    print("WebSocketServer: Failed - \(error)")
+                    self?.log("❌ FAILED - \(error)")
                     self?.isRunning = false
                 case .cancelled:
-                    print("WebSocketServer: Cancelled")
+                    self?.log("🛑 Cancelled")
                     self?.isRunning = false
-                default:
-                    break
+                case .setup:
+                    self?.log("🔧 Setting up...")
+                @unknown default:
+                    self?.log("Unknown state: \(state)")
                 }
             }
             
             listener?.newConnectionHandler = { [weak self] connection in
+                self?.connectionAttempts += 1
+                self?.log(">>> INCOMING #\(self?.connectionAttempts ?? 0) from \(connection.endpoint)")
                 self?.handleNewConnection(connection)
             }
             
@@ -129,27 +141,33 @@ class WebSocketServer {
     }
     
     private func handleNewConnection(_ connection: NWConnection) {
-        print("WebSocketServer: New connection from \(connection.endpoint)")
+        let endpoint = "\(connection.endpoint)"
+        log("📥 handleNewConnection: \(endpoint)")
+        log("   Initial state: \(connection.state)")
         
         connection.stateUpdateHandler = { [weak self] state in
             switch state {
+            case .setup:
+                self?.log("   [\(endpoint)] State: setup")
+            case .preparing:
+                self?.log("   [\(endpoint)] State: preparing (WebSocket handshake...)")
             case .ready:
-                print("WebSocketServer: Client connected")
+                self?.log("✅ [\(endpoint)] State: READY - Client connected!")
                 self?.addConnection(connection)
-                
+            case .waiting(let error):
+                self?.log("⏳ [\(endpoint)] State: waiting - \(error)")
             case .failed(let error):
-                print("WebSocketServer: Client failed - \(error)")
+                self?.log("❌ [\(endpoint)] State: FAILED - \(error)")
                 self?.removeConnection(connection)
-                
             case .cancelled:
-                print("WebSocketServer: Client disconnected")
+                self?.log("🛑 [\(endpoint)] State: cancelled - Client disconnected")
                 self?.removeConnection(connection)
-                
-            default:
-                break
+            @unknown default:
+                self?.log("   [\(endpoint)] State: unknown (\(state))")
             }
         }
         
+        log("   Starting connection...")
         connection.start(queue: queue)
         
         // Start receiving (for pings/pongs and close frames)
@@ -158,8 +176,10 @@ class WebSocketServer {
     
     private func receiveMessage(on connection: NWConnection) {
         connection.receiveMessage { [weak self] data, context, isComplete, error in
+            let endpoint = "\(connection.endpoint)"
+            
             if let error = error {
-                print("WebSocketServer: Receive error - \(error)")
+                self?.log("📨 [\(endpoint)] Receive error: \(error)")
                 return
             }
             
@@ -168,11 +188,21 @@ class WebSocketServer {
                let metadata = context.protocolMetadata(definition: NWProtocolWebSocket.definition) as? NWProtocolWebSocket.Metadata {
                 switch metadata.opcode {
                 case .close:
-                    print("WebSocketServer: Client sent close frame")
+                    self?.log("📨 [\(endpoint)] Received CLOSE frame")
                     connection.cancel()
                     return
+                case .ping:
+                    self?.log("📨 [\(endpoint)] Received PING (auto-reply)")
+                case .pong:
+                    self?.log("📨 [\(endpoint)] Received PONG")
+                case .text:
+                    if let data = data, let text = String(data: data, encoding: .utf8) {
+                        self?.log("📨 [\(endpoint)] Received TEXT: \(text.prefix(100))")
+                    }
+                case .binary:
+                    self?.log("📨 [\(endpoint)] Received BINARY (\(data?.count ?? 0) bytes)")
                 default:
-                    break
+                    self?.log("📨 [\(endpoint)] Received opcode: \(metadata.opcode)")
                 }
             }
             
@@ -187,6 +217,8 @@ class WebSocketServer {
         let count = connections.count
         connectionsLock.unlock()
         
+        log("➕ Added connection. Total clients: \(count)")
+        
         DispatchQueue.main.async { [weak self] in
             self?.onClientCountChanged?(count)
         }
@@ -194,12 +226,17 @@ class WebSocketServer {
     
     private func removeConnection(_ connection: NWConnection) {
         connectionsLock.lock()
+        let beforeCount = connections.count
         connections.removeAll { $0 === connection }
-        let count = connections.count
+        let afterCount = connections.count
         connectionsLock.unlock()
         
+        if beforeCount != afterCount {
+            log("➖ Removed connection. Total clients: \(afterCount)")
+        }
+        
         DispatchQueue.main.async { [weak self] in
-            self?.onClientCountChanged?(count)
+            self?.onClientCountChanged?(afterCount)
         }
     }
 }
