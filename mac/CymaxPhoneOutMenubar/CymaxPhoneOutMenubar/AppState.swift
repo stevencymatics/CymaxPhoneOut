@@ -322,30 +322,6 @@ class AppState: ObservableObject {
     
     // MARK: - Audio Capture
     
-    // #region agent log - debug file logger
-    private func debugLog(_ hypothesisId: String, _ message: String, _ data: [String: Any] = [:]) {
-        let logPath = "/Users/stevencymatics/Documents/Phone Audio Project/.cursor/debug.log"
-        var logData: [String: Any] = [
-            "timestamp": Int(Date().timeIntervalSince1970 * 1000),
-            "location": "AppState.swift",
-            "sessionId": "debug-session",
-            "hypothesisId": hypothesisId,
-            "message": message,
-            "data": data
-        ]
-        if let jsonData = try? JSONSerialization.data(withJSONObject: logData),
-           let jsonString = String(data: jsonData, encoding: .utf8) {
-            if let handle = FileHandle(forWritingAtPath: logPath) {
-                handle.seekToEndOfFile()
-                handle.write((jsonString + "\n").data(using: .utf8)!)
-                handle.closeFile()
-            } else {
-                FileManager.default.createFile(atPath: logPath, contents: (jsonString + "\n").data(using: .utf8))
-            }
-        }
-    }
-    // #endregion
-    
     /// Open System Settings to Screen Recording permission pane
     func openScreenRecordingSettings() {
         SystemAudioCapture.openSystemSettings()
@@ -356,16 +332,6 @@ class AppState: ObservableObject {
         log("Starting system audio capture...")
         captureStatus = "Starting..."
         needsPermission = false  // Reset permission flag
-        
-        // #region agent log
-        // Check Info.plist for required keys
-        let screenCaptureDesc = Bundle.main.object(forInfoDictionaryKey: "NSScreenCaptureUsageDescription") as? String
-        let hasPermission = SystemAudioCapture.hasPermission()
-        debugLog("D", "Checking Info.plist keys and permission", [
-            "NSScreenCaptureUsageDescription": screenCaptureDesc ?? "NOT SET",
-            "hasPermission": hasPermission
-        ])
-        // #endregion
         
         audioCapture = SystemAudioCapture()
         
@@ -391,30 +357,13 @@ class AppState: ObservableObject {
         
         Task {
             do {
-                // #region agent log
-                debugLog("E", "About to call audioCapture.start()", [:])
-                // #endregion
-                
                 try await audioCapture?.start()
                 await MainActor.run {
-                    // #region agent log
-                    self.debugLog("E", "audioCapture.start() SUCCEEDED", [:])
-                    // #endregion
                     self.isCaptureActive = true
                     self.captureStatus = "Capturing"
                 }
             } catch {
                 await MainActor.run {
-                    // #region agent log
-                    let nsError = error as NSError
-                    self.debugLog("A,B,C,D,E", "audioCapture.start() FAILED in AppState", [
-                        "errorDomain": nsError.domain,
-                        "errorCode": nsError.code,
-                        "errorDescription": error.localizedDescription,
-                        "errorFull": String(describing: error)
-                    ])
-                    // #endregion
-                    
                     // Check if it's a permission issue
                     if let captureError = error as? CaptureError, captureError == .notAuthorized {
                         self.needsPermission = true
@@ -531,12 +480,6 @@ func processAudioGlobally(samples: [Float], sampleRate: Int, channels: Int, serv
     let ch = channels
     
     gAudioQueue.async {
-        // #region agent log - H5 track timing
-        if gStartTime == 0 {
-            gStartTime = CFAbsoluteTimeGetCurrent()
-        }
-        // #endregion
-        
         let framesPerPacket = 128
         let samplesPerPacket = framesPerPacket * ch
         
@@ -593,44 +536,6 @@ func processAudioGlobally(samples: [Float], sampleRate: Int, channels: Int, serv
             
             offset = end
         }
-        
-        // #region agent log - H5 rate measurement
-        if gAudioPacketsSent % 500 == 0 {
-            let elapsed = CFAbsoluteTimeGetCurrent() - gStartTime
-            let expectedFrames = Int(elapsed * Double(sr))
-            let drift = gTotalFramesSent - expectedFrames
-            let effectiveRate = elapsed > 0 ? Double(gTotalFramesSent) / elapsed : 0
-            
-            let logPath = "/Users/stevencymatics/Documents/Phone Audio Project/.cursor/debug.log"
-            let logData: [String: Any] = [
-                "timestamp": Int(Date().timeIntervalSince1970 * 1000),
-                "location": "AppState.processAudioGlobally",
-                "sessionId": "debug-session",
-                "hypothesisId": "H5",
-                "message": "RATE_CHECK",
-                "data": [
-                    "elapsedSec": elapsed,
-                    "totalFramesSent": gTotalFramesSent,
-                    "expectedFrames": expectedFrames,
-                    "drift": drift,
-                    "driftPercent": expectedFrames > 0 ? Double(drift) / Double(expectedFrames) * 100 : 0,
-                    "effectiveRate": effectiveRate,
-                    "targetRate": sr,
-                    "packetsTotal": gAudioPacketsSent
-                ]
-            ]
-            if let jsonData = try? JSONSerialization.data(withJSONObject: logData),
-               let jsonString = String(data: jsonData, encoding: .utf8) {
-                if let handle = FileHandle(forWritingAtPath: logPath) {
-                    handle.seekToEndOfFile()
-                    handle.write((jsonString + "\n").data(using: .utf8)!)
-                    handle.closeFile()
-                } else if FileManager.default.createFile(atPath: logPath, contents: (jsonString + "\n").data(using: .utf8)) {
-                    // File created
-                }
-            }
-        }
-        // #endregion
         
         // Update UI periodically
         if packetCount > 0 && gAudioPacketsSent % 10 == 0 {

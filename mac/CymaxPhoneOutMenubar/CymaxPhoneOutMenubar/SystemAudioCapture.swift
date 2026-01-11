@@ -61,85 +61,23 @@ class SystemAudioCapture: NSObject, SCStreamDelegate, SCStreamOutput {
         }
     }
     
-    // #region agent log - debug file logger
-    private func debugLog(_ hypothesisId: String, _ message: String, _ data: [String: Any] = [:]) {
-        let logPath = "/Users/stevencymatics/Documents/Phone Audio Project/.cursor/debug.log"
-        let logData: [String: Any] = [
-            "timestamp": Int(Date().timeIntervalSince1970 * 1000),
-            "location": "SystemAudioCapture.swift",
-            "sessionId": "debug-session",
-            "hypothesisId": hypothesisId,
-            "message": message,
-            "data": data
-        ]
-        if let jsonData = try? JSONSerialization.data(withJSONObject: logData),
-           let jsonString = String(data: jsonData, encoding: .utf8) {
-            if let handle = FileHandle(forWritingAtPath: logPath) {
-                handle.seekToEndOfFile()
-                handle.write((jsonString + "\n").data(using: .utf8)!)
-                handle.closeFile()
-            } else {
-                FileManager.default.createFile(atPath: logPath, contents: (jsonString + "\n").data(using: .utf8))
-            }
-        }
-    }
-    // #endregion
-    
     /// Start capturing system audio
     func start() async throws {
         guard !isCapturing else { return }
         
-        // #region agent log
-        let bundleId = Bundle.main.bundleIdentifier ?? "unknown"
-        let execPath = Bundle.main.executablePath ?? "unknown"
-        let hasPermission = SystemAudioCapture.hasPermission()
-        debugLog("A,D", "start() called - checking app identity and permission", [
-            "bundleIdentifier": bundleId,
-            "executablePath": execPath,
-            "hasPermission": hasPermission
-        ])
-        // #endregion
-        
         // Check permission WITHOUT prompting - never call CGRequestScreenCaptureAccess
         // This avoids the system dialog that restarts the app
         if !SystemAudioCapture.hasPermission() {
-            // #region agent log
-            debugLog("B", "Permission NOT granted - user must grant manually", [:])
-            // #endregion
             throw CaptureError.notAuthorized
         }
         
         onStatusUpdate?("Setting up audio capture...")
         
-        // #region agent log
-        debugLog("E", "About to call SCShareableContent.excludingDesktopWindows", [:])
-        // #endregion
-        
         // Get available content
-        let availableContent: SCShareableContent
-        do {
-            availableContent = try await SCShareableContent.excludingDesktopWindows(
-                false,
-                onScreenWindowsOnly: false
-            )
-            // #region agent log
-            debugLog("E", "SCShareableContent succeeded", [
-                "displayCount": availableContent.displays.count,
-                "windowCount": availableContent.windows.count
-            ])
-            // #endregion
-        } catch {
-            // #region agent log
-            let nsError = error as NSError
-            debugLog("A,B,C,E", "SCShareableContent FAILED", [
-                "errorDomain": nsError.domain,
-                "errorCode": nsError.code,
-                "errorDescription": error.localizedDescription,
-                "errorDebugDesc": String(describing: error)
-            ])
-            // #endregion
-            throw error
-        }
+        let availableContent = try await SCShareableContent.excludingDesktopWindows(
+            false,
+            onScreenWindowsOnly: false
+        )
         
         // We need at least one display to create a stream
         guard let display = availableContent.displays.first else {
@@ -198,54 +136,16 @@ class SystemAudioCapture: NSObject, SCStreamDelegate, SCStreamOutput {
     // Track actual sample rate from audio buffers
     private var detectedSampleRate: Int = 48000
     private var hasLoggedFormat = false
-    private var bufferCount = 0
-    private var totalSamplesReceived = 0
-    private var captureStartTime: CFAbsoluteTime = 0
     
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
         // Only process audio
         guard type == .audio else { return }
-        
-        bufferCount += 1
-        
-        // #region agent log - H5/H6 timing
-        if captureStartTime == 0 {
-            captureStartTime = CFAbsoluteTimeGetCurrent()
-        }
-        // #endregion
         
         // Get the ACTUAL sample rate from the format description
         if let formatDescription = CMSampleBufferGetFormatDescription(sampleBuffer),
            let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(formatDescription)?.pointee {
             let actualRate = Int(asbd.mSampleRate)
             let actualChannels = Int(asbd.mChannelsPerFrame)
-            
-            // #region agent log - H1/H2/H12 detailed format detection
-            if !hasLoggedFormat || (bufferCount % 500 == 0) {
-                let formatFlags = asbd.mFormatFlags
-                let isFloat = (formatFlags & kAudioFormatFlagIsFloat) != 0
-                let isInterleaved = (formatFlags & kAudioFormatFlagIsNonInterleaved) == 0
-                let isPacked = (formatFlags & kAudioFormatFlagIsPacked) != 0
-                let bitsPerChannel = asbd.mBitsPerChannel
-                let bytesPerFrame = asbd.mBytesPerFrame
-                let bytesPerPacket = asbd.mBytesPerPacket
-                let framesPerPacket = asbd.mFramesPerPacket
-                
-                debugLog("H12", "SCK_AUDIO_FORMAT", [
-                    "actualRate": actualRate,
-                    "actualChannels": actualChannels,
-                    "isFloat": isFloat,
-                    "isInterleaved": isInterleaved,
-                    "isPacked": isPacked,
-                    "bitsPerChannel": bitsPerChannel,
-                    "bytesPerFrame": bytesPerFrame,
-                    "bytesPerPacket": bytesPerPacket,
-                    "framesPerPacket": framesPerPacket,
-                    "formatFlags": formatFlags,
-                    "bufferCount": bufferCount
-                ])
-            }
-            // #endregion
             
             // Log format once
             if !hasLoggedFormat {
@@ -283,33 +183,6 @@ class SystemAudioCapture: NSObject, SCStreamDelegate, SCStreamOutput {
         let floatPointer = UnsafeRawPointer(dataPointer).assumingMemoryBound(to: Float.self)
         let sampleCount = length / MemoryLayout<Float>.size
         let frameCount = sampleCount / channels  // frames = total samples / channels
-        
-        totalSamplesReceived += sampleCount
-        
-        // #region agent log - H3/H5/H6 buffer and rate check
-        if bufferCount <= 5 || bufferCount % 500 == 0 {
-            let maxSample = (0..<min(sampleCount, 100)).map { abs(floatPointer[$0]) }.max() ?? 0
-            let elapsed = CFAbsoluteTimeGetCurrent() - captureStartTime
-            let framesReceived = totalSamplesReceived / channels
-            let expectedFrames = Int(elapsed * Double(detectedSampleRate))
-            let drift = framesReceived - expectedFrames
-            let effectiveRate = elapsed > 0 ? Double(framesReceived) / elapsed : 0
-            
-            debugLog("H5", "SCK_RATE", [
-                "bufferCount": bufferCount,
-                "sampleCount": sampleCount,
-                "frames": frameCount,
-                "totalFramesReceived": framesReceived,
-                "elapsedSec": elapsed,
-                "expectedFrames": expectedFrames,
-                "drift": drift,
-                "driftPercent": expectedFrames > 0 ? Double(drift) / Double(expectedFrames) * 100 : 0,
-                "effectiveRate": effectiveRate,
-                "detectedRate": detectedSampleRate,
-                "maxSample": maxSample
-            ])
-        }
-        // #endregion
         
         // Convert from NON-INTERLEAVED to INTERLEAVED format
         // Input:  [L0, L1, L2, ..., L(n-1), R0, R1, R2, ..., R(n-1)]
@@ -353,5 +226,3 @@ enum CaptureError: Error, LocalizedError {
         }
     }
 }
-
-

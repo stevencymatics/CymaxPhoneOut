@@ -39,8 +39,8 @@ def create_icon(size):
     num_bars = 5
     bar_width = int(65 * s)
     bar_spacing = int(110 * s)
-    total_width = (num_bars - 1) * bar_spacing
-    start_x = cx - total_width // 2
+    total_width = (num_bars - 1) * bar_spacing + bar_width  # Include bar width in total
+    start_x = cx - total_width // 2  # Center properly
     
     # Waveform heights - dramatic variation
     heights = [0.35, 0.75, 1.0, 0.6, 0.25]
@@ -67,41 +67,33 @@ def create_icon(size):
     img = Image.alpha_composite(img, glow_layer)
     draw = ImageDraw.Draw(img)
     
-    # Second pass - draw actual bars with gradient effect
+    # Second pass - draw actual bars using circles + rectangle (avoids center line artifact)
     for i, h in enumerate(heights):
         bar_height = int(max_height * h)
         x = start_x + i * bar_spacing
         y1 = cy - bar_height // 2
         y2 = cy + bar_height // 2
         
-        # Create gradient for each bar
-        bar_img = Image.new('RGBA', (bar_width + int(20*s), bar_height + int(20*s)), (0, 0, 0, 0))
-        bar_draw = ImageDraw.Draw(bar_img)
+        # Radius for rounded ends
+        radius = bar_width // 2
         
-        # Main bar with slight gradient (top cyan, bottom teal)
-        for row in range(bar_height):
-            ratio = row / bar_height
-            r = int(cyan[0] * (1 - ratio) + teal[0] * ratio)
-            g = int(cyan[1] * (1 - ratio) + teal[1] * ratio)
-            b = int(cyan[2] * (1 - ratio) + teal[2] * ratio)
-            bar_draw.rounded_rectangle(
-                [int(10*s), int(10*s) + row, int(10*s) + bar_width, int(11*s) + row],
-                radius=0,
-                fill=(r, g, b, 255)
-            )
-        
-        # Round the corners
-        mask = Image.new('L', bar_img.size, 0)
-        mask_draw = ImageDraw.Draw(mask)
-        mask_draw.rounded_rectangle(
-            [int(10*s), int(10*s), int(10*s) + bar_width, int(10*s) + bar_height],
-            radius=int(30 * s),
-            fill=255
+        # Draw top circle
+        draw.ellipse(
+            [x, y1, x + bar_width, y1 + bar_width],
+            fill=cyan
         )
-        bar_img.putalpha(mask)
         
-        # Paste bar onto main image
-        img.paste(bar_img, (x - int(10*s), y1 - int(10*s)), bar_img)
+        # Draw bottom circle
+        draw.ellipse(
+            [x, y2 - bar_width, x + bar_width, y2],
+            fill=cyan
+        )
+        
+        # Draw middle rectangle (overlaps with circles)
+        draw.rectangle(
+            [x, y1 + radius, x + bar_width, y2 - radius],
+            fill=cyan
+        )
     
     return img
 
