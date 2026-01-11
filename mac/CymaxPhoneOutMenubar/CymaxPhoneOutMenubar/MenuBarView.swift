@@ -19,8 +19,71 @@ struct MenuBarView: View {
     @State private var hoveringTrafficLights = false
     
     var body: some View {
+        ZStack {
+            // Main content (blurred when permission needed)
+            VStack(spacing: 0) {
+                // Traffic light buttons (top left)
+                HStack {
+                    trafficLightButtons
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 10)
+                
+                // Header (without Live indicator when permission needed)
+                headerView
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                    .padding(.bottom, 12)
+                
+                // Main content
+                VStack(spacing: 16) {
+                    // QR Code & Connection
+                    connectionView
+                    
+                    // Status indicators (without permission box - shown in overlay)
+                    if !appState.needsPermission {
+                        statusView
+                    }
+                    
+                    // Controls
+                    controlsView
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 16)
+                
+                if showingLog {
+                    Divider()
+                        .background(Color.white.opacity(0.1))
+                    logView
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+                }
+                
+                // Footer
+                Divider()
+                    .background(Color.white.opacity(0.1))
+                footerView
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+            }
+            .blur(radius: appState.needsPermission ? 8 : 0)
+            .opacity(appState.needsPermission ? 0.3 : 1)
+            
+            // Permission overlay
+            if appState.needsPermission {
+                permissionOverlay
+            }
+        }
+        .frame(width: 300)
+        .background(Color(red: 0.08, green: 0.08, blue: 0.08))
+    }
+    
+    // MARK: - Permission Overlay
+    
+    private var permissionOverlay: some View {
         VStack(spacing: 0) {
-            // Traffic light buttons (top left)
+            // Traffic lights at top
             HStack {
                 trafficLightButtons
                 Spacer()
@@ -28,43 +91,105 @@ struct MenuBarView: View {
             .padding(.horizontal, 12)
             .padding(.top, 10)
             
-            // Header
-            headerView
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
-                .padding(.bottom, 12)
-            
-            // Main content
-            VStack(spacing: 16) {
-                // QR Code & Connection
-                connectionView
+            // Permission content
+            VStack(spacing: 20) {
+                // Header
+                VStack(spacing: 8) {
+                    Image(systemName: "rectangle.inset.filled.and.person.filled")
+                        .font(.system(size: 36))
+                        .foregroundColor(.orange)
+                    
+                    Text("Permission Required")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(.white)
+                    
+                    Text("Mix Link needs Screen Recording access to capture your Mac's audio")
+                        .font(.system(size: 11))
+                        .foregroundColor(.gray)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 10)
+                }
                 
-                // Status indicators
-                statusView
+                // Steps
+                VStack(alignment: .leading, spacing: 10) {
+                    permissionStep(number: 1, text: "Click \"Open Settings\" below")
+                    permissionStep(number: 2, text: "Find \"Screen & System Audio\" section and click +")
+                    permissionStep(number: 3, text: "Select \"Mix Link\" from the list")
+                    permissionStep(number: 4, text: "Enter password if prompted")
+                }
+                .padding(14)
+                .background(Color.white.opacity(0.05))
+                .cornerRadius(10)
                 
-                // Controls
-                controlsView
+                // Buttons
+                VStack(spacing: 10) {
+                    Button(action: { appState.openScreenRecordingSettings() }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "gear")
+                                .font(.system(size: 14))
+                            Text("Open Settings")
+                                .font(.system(size: 13, weight: .semibold))
+                        }
+                        .foregroundColor(.black)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.orange)
+                        .cornerRadius(10)
+                    }
+                    .buttonStyle(.plain)
+                    
+                    Button(action: {
+                        // macOS requires app restart to pick up new TCC permissions
+                        restartApp()
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 11))
+                            Text("I've enabled it - Restart App")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .foregroundColor(.orange)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color.orange.opacity(0.1))
+                        .cornerRadius(8)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 16)
+            .padding(20)
+            .background(Color(red: 0.10, green: 0.10, blue: 0.10))
+            .cornerRadius(16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+            )
+            .padding(.horizontal, 16)
+            .padding(.top, 20)
             
-            if showingLog {
-                Divider()
-                    .background(Color.white.opacity(0.1))
-                logView
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 12)
-            }
-            
-            // Footer
-            Divider()
-                .background(Color.white.opacity(0.1))
-            footerView
-                .padding(.horizontal, 20)
-                .padding(.vertical, 10)
+            Spacer()
         }
-        .frame(width: 300)
-        .background(Color(red: 0.08, green: 0.08, blue: 0.08))
+    }
+    
+    private func permissionStep(number: Int, text: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            // Number circle
+            ZStack {
+                Circle()
+                    .fill(Color.orange)
+                    .frame(width: 20, height: 20)
+                Text("\(number)")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(.black)
+            }
+            
+            // Step text - allow wrapping
+            Text(text)
+                .font(.system(size: 11))
+                .foregroundColor(.white.opacity(0.9))
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
     
     // MARK: - Traffic Light Buttons
@@ -128,16 +253,18 @@ struct MenuBarView: View {
             
             Spacer()
             
-            // Status indicator
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(appState.isServerRunning ? Color.mixLinkCyan : Color.gray.opacity(0.5))
-                    .frame(width: 8, height: 8)
-                    .shadow(color: appState.isServerRunning ? Color.mixLinkCyan.opacity(0.6) : .clear, radius: 4)
-                
-                Text(appState.isServerRunning ? "Live" : "Off")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(appState.isServerRunning ? .mixLinkCyan : .gray)
+            // Status indicator (hidden when permission needed)
+            if !appState.needsPermission {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(appState.isServerRunning ? Color.mixLinkCyan : Color.gray.opacity(0.5))
+                        .frame(width: 8, height: 8)
+                        .shadow(color: appState.isServerRunning ? Color.mixLinkCyan.opacity(0.6) : .clear, radius: 4)
+                    
+                    Text(appState.isServerRunning ? "Live" : "Off")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(appState.isServerRunning ? .mixLinkCyan : .gray)
+                }
             }
         }
     }
@@ -229,55 +356,6 @@ struct MenuBarView: View {
     
     private var statusView: some View {
         VStack(spacing: 8) {
-            // Permission warning
-            if appState.needsPermission {
-                VStack(spacing: 10) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundColor(.orange)
-                        Text("Screen Recording Required")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(.orange)
-                    }
-                    
-                    Text("Enable in System Settings → Privacy → Screen Recording")
-                        .font(.system(size: 10))
-                        .foregroundColor(.gray)
-                        .multilineTextAlignment(.center)
-                    
-                    HStack(spacing: 8) {
-                        Button(action: { appState.openScreenRecordingSettings() }) {
-                            Text("Open Settings")
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundColor(.black)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(Color.orange)
-                                .cornerRadius(6)
-                        }
-                        .buttonStyle(.plain)
-                        
-                        Button(action: {
-                            appState.needsPermission = false
-                            appState.stopServer()
-                            appState.startServer()
-                        }) {
-                            Text("Retry")
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundColor(.orange)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(Color.orange.opacity(0.15))
-                                .cornerRadius(6)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(12)
-                .background(Color.orange.opacity(0.1))
-                .cornerRadius(10)
-            }
-            
             // Connection stats
             if appState.isServerRunning {
                 HStack(spacing: 16) {
@@ -451,6 +529,31 @@ struct MenuBarView: View {
             Color.clear
                 .frame(width: 12, height: 12)
         }
+    }
+    
+    // MARK: - App Restart
+    
+    /// Restart the app to pick up new TCC permissions
+    private func restartApp() {
+        let bundlePath = Bundle.main.bundlePath
+        
+        // Run a background command that waits for us to quit, then relaunches
+        let script = "sleep 0.3 && open \"\(bundlePath)\""
+        
+        let task = Process()
+        task.launchPath = "/bin/bash"
+        task.arguments = ["-c", script]
+        task.standardOutput = FileHandle.nullDevice
+        task.standardError = FileHandle.nullDevice
+        
+        do {
+            try task.run()
+        } catch {
+            // Fallback: just quit
+        }
+        
+        // Quit immediately - the background script will relaunch us
+        NSApp.terminate(nil)
     }
 }
 

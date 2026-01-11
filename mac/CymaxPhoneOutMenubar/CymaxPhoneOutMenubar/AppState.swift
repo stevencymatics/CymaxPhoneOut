@@ -110,6 +110,20 @@ class AppState: ObservableObject {
     
     private func handleWake() {
         log("Mac woke up", level: .info)
+        
+        // First, verify permission is still valid
+        if !SystemAudioCapture.hasPermission() {
+            log("Permission lost after wake", level: .warning)
+            needsPermission = true
+            // Reset state
+            isServerRunning = false
+            isCaptureActive = false
+            webClientsConnected = 0
+            packetsSent = 0
+            captureStatus = "Permission Required"
+            return
+        }
+        
         if wasRunningBeforeSleep {
             // Small delay to let network come back up
             Task {
@@ -117,6 +131,17 @@ class AppState: ObservableObject {
                 await MainActor.run {
                     self.log("Auto-restarting servers...", level: .info)
                     self.startServer()
+                    
+                    // Verify capture started successfully after a delay
+                    Task {
+                        try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 more seconds
+                        await MainActor.run {
+                            if self.isServerRunning && !self.isCaptureActive && !self.needsPermission {
+                                self.log("Capture failed to start after wake, resetting...", level: .error)
+                                self.resetToInitialState(reason: "Capture failed after wake")
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -153,6 +178,14 @@ class AppState: ObservableObject {
     private func performHealthCheck() {
         guard isServerRunning else { return }
         
+        // CRITICAL: Check if permission was revoked while running
+        if !SystemAudioCapture.hasPermission() {
+            log("Permission was revoked!", level: .error)
+            resetToInitialState(reason: "Permission revoked")
+            needsPermission = true
+            return
+        }
+        
         // Check if audio capture is still working
         if isCaptureActive && webClientsConnected > 0 {
             // If we have clients but packets aren't increasing, something's wrong
@@ -178,6 +211,27 @@ class AppState: ObservableObject {
         }
     }
     
+    /// Reset app to initial "not running" state
+    private func resetToInitialState(reason: String) {
+        log("Resetting to initial state: \(reason)", level: .warning)
+        
+        // Stop everything
+        stopHealthCheck()
+        stopAudioCapture()
+        
+        httpServer?.stop()
+        httpServer = nil
+        
+        // Reset all state
+        isServerRunning = false
+        isCaptureActive = false
+        webClientsConnected = 0
+        packetsSent = 0
+        captureStatus = "Ready"
+        
+        log("App reset complete")
+    }
+    
     private func restartAudioCapture() {
         stopAudioCapture()
         
@@ -196,6 +250,14 @@ class AppState: ObservableObject {
         guard !isServerRunning else { return }
         
         log("Starting server...")
+        
+        // Check permission FIRST before starting anything
+        if !SystemAudioCapture.hasPermission() {
+            log("Permission not granted", level: .warning)
+            needsPermission = true
+            captureStatus = "Permission Required"
+            return
+        }
         
         // Get local IP
         guard let localIP = QRCodeGenerator.getLocalIPAddress() else {

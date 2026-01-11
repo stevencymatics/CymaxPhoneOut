@@ -10,6 +10,7 @@ Stream system audio from your Mac to your iPhone in real-time over WiFi. **No ap
 - **QR code connection** - scan and play in seconds
 - **Works with iPhone silent mode** - audio plays even when muted
 - **Lock screen controls** - play/pause from iOS lock screen
+- **Safari & Chrome support** - works on both browsers
 - Works with any audio source: Apple Music, Spotify, YouTube, **FL Studio**, Logic Pro, etc.
 - ~80-150ms latency over WiFi
 
@@ -24,26 +25,35 @@ Stream system audio from your Mac to your iPhone in real-time over WiFi. **No ap
 | 🔇 Silent Mode Support | Bypasses iPhone mute switch |
 | 🔒 Lock Screen Controls | Play/pause from iOS lock screen & Control Center |
 | 🔄 Auto-Reconnect | Handles network interruptions gracefully |
+| 🍎 Safari Compatible | HTTP streaming fallback for Safari |
 
 ## 🚀 Quick Start
 
-### 1. Build & Run the Mac App
+### Option 1: Use Pre-Built App (Recommended)
+
+1. Download `MixLink.dmg` from Releases
+2. Open DMG and drag **Mix Link** to Applications
+3. **Right-click → Open** (first time only, to bypass Gatekeeper)
+4. Grant Screen Recording permission when prompted
+5. Scan QR code with your phone - done!
+
+### Option 2: Build from Source
 
 ```bash
 cd mac/CymaxPhoneOutMenubar
 xcodebuild -scheme CymaxPhoneOutMenubar -configuration Debug
-open ~/Library/Developer/Xcode/DerivedData/CymaxPhoneOutMenubar-*/Build/Products/Debug/CymaxPhoneOutMenubar.app
+open ~/Library/Developer/Xcode/DerivedData/CymaxPhoneOutMenubar-*/Build/Products/Debug/"Mix Link.app"
 ```
 
 Or open in Xcode and press ⌘R.
 
-### 2. Grant Screen Recording Permission
+### Grant Screen Recording Permission
 
-The first time you run the app, macOS will ask for **Screen Recording** permission (needed to capture system audio). Grant it in System Settings → Privacy & Security → Screen Recording.
+The first time you run the app, it will show a permission screen. Click **Open Settings** and add Mix Link to the "Screen & System Audio Recording" list.
 
-### 3. Connect Your Phone
+### Connect Your Phone
 
-1. Click the 📡 icon in your Mac's menubar
+1. Click the waveform icon in your Mac's menubar
 2. Scan the QR code with your iPhone camera
 3. Open the link in Chrome or Safari
 4. Tap the **Play** button
@@ -58,16 +68,17 @@ Phone Audio Project/
 │       ├── AppState.swift          # Main app state & audio processing
 │       ├── MenuBarView.swift       # Menubar UI with QR code
 │       ├── SystemAudioCapture.swift # ScreenCaptureKit audio capture
-│       ├── WebSocketServer.swift   # WebSocket server for streaming
-│       ├── HTTPServer.swift        # HTTP server for web player
+│       ├── HTTPServer.swift        # Combined HTTP + WebSocket server
 │       ├── WebPlayerHTML.swift     # Embedded web audio player
-│       └── QRCodeGenerator.swift   # QR code generation
+│       ├── QRCodeGenerator.swift   # QR code generation
+│       └── Assets.xcassets/        # App icon (circular cyan waveform)
 │
 ├── mac/CymaxPhoneOutDriver/       # (Legacy) Virtual audio driver
-│   └── ...                         # For FL Studio/DAW direct output
 │
-└── ios/CymaxPhoneReceiver/        # (Legacy) Native iOS app
-    └── ...                         # Alternative to web player
+└── docs/                          # Documentation
+    ├── QUICK_START.md
+    ├── IOS_SILENT_MODE_FIX.md
+    └── DEVELOPMENT_NOTES.md
 ```
 
 ## 🏗️ Architecture
@@ -77,39 +88,38 @@ Phone Audio Project/
 │                          macOS                               │
 │                                                              │
 │  ┌──────────────┐    ┌─────────────────────────────────┐    │
-│  │  Menubar App │    │     ScreenCaptureKit            │    │
-│  │   (SwiftUI)  │◄───│  (System Audio Capture)         │    │
+│  │   Mix Link   │    │     ScreenCaptureKit            │    │
+│  │  Menubar App │◄───│  (System Audio Capture)         │    │
 │  │              │    │                                  │    │
 │  │  - QR Code   │    │  48kHz Stereo Float32           │    │
 │  │  - Status    │    │  Non-interleaved → Interleaved  │    │
 │  └──────┬───────┘    └─────────────────────────────────┘    │
 │         │                                                    │
-│  ┌──────▼───────┐    ┌─────────────────────────────────┐    │
-│  │ HTTP Server  │    │      WebSocket Server           │    │
-│  │  (Port 19621)│    │       (Port 19622)              │    │
-│  │              │    │                                  │    │
-│  │ Serves web   │    │  Streams audio packets          │    │
-│  │ player HTML  │    │  128 frames/packet              │    │
-│  └──────────────┘    └──────────────┬──────────────────┘    │
-│                                      │                       │
-└──────────────────────────────────────┼───────────────────────┘
-                                       │ WiFi
-                                       ▼
+│  ┌──────▼──────────────────────────────────────────────┐    │
+│  │          Combined HTTP + WebSocket Server            │    │
+│  │                   (Port 19621)                       │    │
+│  │                                                      │    │
+│  │  • Serves web player HTML                           │    │
+│  │  • WebSocket for Chrome (fast)                      │    │
+│  │  • HTTP streaming for Safari (fallback)             │    │
+│  │  • 128 frames/packet                                │    │
+│  └──────────────────────────┬───────────────────────────┘    │
+│                             │                                │
+└─────────────────────────────┼────────────────────────────────┘
+                              │ WiFi
+                              ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                         iPhone                               │
 │                                                              │
 │  ┌─────────────────────────────────────────────────────┐    │
 │  │              Web Browser (Chrome/Safari)             │    │
 │  │                                                      │    │
-│  │  ┌──────────┐  ┌──────────┐  ┌─────────────────┐   │    │
-│  │  │WebSocket │─▶│ Circular │─▶│ ScriptProcessor │   │    │
-│  │  │ Client   │  │  Buffer  │  │  (Web Audio)    │   │    │
-│  │  └──────────┘  └──────────┘  └────────┬────────┘   │    │
-│  │                                        │            │    │
-│  │                              ┌─────────▼─────────┐  │    │
-│  │                              │   AudioContext    │  │    │
-│  │                              │    (48kHz)        │  │    │
-│  │                              └───────────────────┘  │    │
+│  │  Chrome: WebSocket ──┐                              │    │
+│  │  Safari: HTTP Stream ┼──▶ Circular ──▶ Web Audio    │    │
+│  │                      │    Buffer       API          │    │
+│  │                      └──────────────────────────────│    │
+│  │                                                      │    │
+│  │  MediaStreamDestination → <audio> (silent mode fix) │    │
 │  └─────────────────────────────────────────────────────┘    │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
@@ -118,7 +128,7 @@ Phone Audio Project/
 ### Audio Packet Format
 
 ```
-WebSocket Binary Message (16-byte header + audio data):
+Binary Message (16-byte header + audio data):
 ┌──────────────────────────────────────────────────────────────┐
 │ sequence (4) │ timestamp (4) │ sampleRate (4) │ channels (2) │
 ├──────────────────────────────────────────────────────────────┤
@@ -130,7 +140,7 @@ WebSocket Binary Message (16-byte header + audio data):
 ## 🔧 Requirements
 
 - **macOS 13+ (Ventura)** - for ScreenCaptureKit
-- **Xcode 15+**
+- **Xcode 15+** (for building from source)
 - **iPhone/iPad** with modern web browser
 - **Same WiFi network** for Mac and phone
 
@@ -140,8 +150,9 @@ WebSocket Binary Message (16-byte header + audio data):
 
 | Setting | Value | Purpose |
 |---------|-------|---------|
-| Prebuffer | 200ms | Wait before starting playback |
-| Target Buffer | 300ms | Desired buffer level |
+| Initial Prebuffer | 5ms | Fast startup |
+| Rebuffer Threshold | 45ms | Auto-recovery |
+| Target Buffer | 80ms | Low latency target |
 | Max Buffer | 3 seconds | Circular buffer capacity |
 
 ### Audio Format
@@ -157,34 +168,54 @@ WebSocket Binary Message (16-byte header + audio data):
 
 ### No Audio
 
-1. **Check Screen Recording permission** - System Settings → Privacy & Security → Screen Recording
+1. **Check Screen Recording permission** - System Settings → Privacy & Security → Screen & System Audio Recording
 2. **Make sure audio is playing** on your Mac
-3. **Check the buffer indicator** in the web player - should show 100-300ms
+3. **Check the buffer indicator** in the web player
 
-### Audio Sounds Wrong (Chipmunk/Distorted)
+### Permission Issues
 
-This was caused by ScreenCaptureKit outputting **non-interleaved** audio. Fixed in latest version by converting to interleaved format before sending.
+If the app keeps asking for permission after you've granted it:
+1. Click "I've enabled it - Restart App" to restart
+2. macOS requires an app restart to pick up new permissions
 
-### Connection Issues
+### Safari Won't Connect
 
-1. **Same WiFi network** - Mac and phone must be on same network
-2. **Firewall** - Allow incoming connections for the app
-3. **Try refreshing** the web page on your phone
+Safari uses HTTP streaming fallback. If it's slow:
+1. Wait for the initial connection (may take 1-2 seconds)
+2. Once connected, playback should be smooth
+3. Chrome is faster if available
 
-### "Connected Phones: 2" but only one phone
+### Audio Cuts Out
 
-Close any extra browser tabs that may have the player open.
+The app has auto-reconnect. If audio stops:
+1. Check your WiFi connection
+2. The web player will show a spinner while reconnecting
+3. After 2 failed attempts, it shows "No connection found"
 
-## 📦 Distribution (For Testers)
+### Mac Goes to Sleep
 
-Want to share Mix Link with others? A pre-built DMG is included in the repo: `CymaxLink.dmg`
+Mix Link automatically stops when your Mac sleeps and restarts when it wakes. If permission was revoked during sleep, you'll see the permission screen.
+
+## 📦 Distribution
+
+Want to share Mix Link with others?
+
+### Building a DMG
+
+```bash
+# Build release version
+cd mac/CymaxPhoneOutMenubar
+xcodebuild -scheme CymaxPhoneOutMenubar -configuration Release
+
+# Create DMG (use Disk Utility or create-dmg tool)
+```
 
 ### What Testers Need to Do
 
-1. Download `CymaxLink.dmg`
-2. Open it and drag the app to Applications
-3. **Right-click → Open** (first time only, to bypass Gatekeeper)
-4. Grant Screen Recording permission when prompted
+1. Download the DMG
+2. Open it and drag **Mix Link** to Applications
+3. **Right-click → Open** (first time only)
+4. Grant Screen Recording permission
 5. Scan QR code with phone - done!
 
 ## 🔮 Future Improvements
@@ -193,7 +224,9 @@ Want to share Mix Link with others? A pre-built DMG is included in the repo: `Cy
 - [ ] Volume control in web player
 - [ ] Latency display
 - [ ] Multiple simultaneous listeners
-- [x] ~~Native iOS app option (for background playback)~~ - Solved with lock screen controls!
+- [x] ~~Safari support~~ - Done with HTTP streaming fallback!
+- [x] ~~Silent mode support~~ - Done with MediaStreamDestination trick!
+- [x] ~~Lock screen controls~~ - Done with Media Session API!
 - [ ] Code signing & notarization for easier distribution
 
 ## 📊 Technical Notes
@@ -205,26 +238,13 @@ Want to share Mix Link with others? A pre-built DMG is included in the repo: `Cy
 - No driver installation required
 - Apple's recommended approach for audio capture
 
-### Why Web Audio API?
+### Why Single Port (19621)?
 
-- **No app install** on iPhone
-- Works on any device with a browser
-- Easy to update (just refresh the page)
-- Cross-platform potential (Android, tablets, etc.)
+Safari has restrictions on cross-port WebSocket connections. By serving both HTTP and WebSocket on the same port, we ensure Safari compatibility.
 
-### Non-Interleaved to Interleaved Conversion
+### iOS Silent Mode Bypass
 
-ScreenCaptureKit outputs audio as:
-```
-[L0, L1, L2, ..., Ln, R0, R1, R2, ..., Rn]  (non-interleaved)
-```
-
-We convert to:
-```
-[L0, R0, L1, R1, L2, R2, ..., Ln, Rn]  (interleaved)
-```
-
-This is required because Web Audio API expects interleaved stereo.
+See [docs/IOS_SILENT_MODE_FIX.md](docs/IOS_SILENT_MODE_FIX.md) for the technical details on how we bypass iOS's mute switch using MediaStreamDestination.
 
 ## 📄 License
 
