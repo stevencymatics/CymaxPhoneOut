@@ -97,14 +97,11 @@ class QRCodeGenerator {
     }
     
     /// Generate the full URL for the web player
-    /// Uses nip.io wildcard DNS for a friendlier iOS camera display
     static func getWebPlayerURL(httpPort: UInt16 = 19621) -> String? {
         guard let ip = getLocalIPAddress() else {
             return nil
         }
-        // nip.io resolves mixlink.X.X.X.X.nip.io to X.X.X.X
-        // This makes iOS camera show "mixlink.x.x.x.x.nip.io" instead of raw IP
-        return "http://mixlink.\(ip).nip.io:\(httpPort)"
+        return "http://\(ip):\(httpPort)"
     }
 }
 
