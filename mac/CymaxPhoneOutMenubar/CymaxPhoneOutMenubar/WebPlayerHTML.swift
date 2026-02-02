@@ -1019,11 +1019,19 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
                 const bufferMs = Math.round((bufferedSamples / 2) / outputRate * 1000);
                 document.getElementById('packets').textContent = packetsReceived;
                 document.getElementById('buffer').textContent = bufferMs + 'ms';
-                
+
                 if (packetsReceived % 200 === 0) {
                     debugLog('Stats: packets=' + packetsReceived + ', buffer=' + bufferMs + 'ms');
                 }
             }
+
+            // Update visualizer directly from incoming audio (more reliable than ScriptProcessor)
+            // Extract left channel samples (interleaved L R L R -> just L)
+            const leftChannel = new Float32Array(audioData.length / 2);
+            for (let i = 0; i < leftChannel.length; i++) {
+                leftChannel[i] = audioData[i * 2];
+            }
+            updateVisualizer(leftChannel);
         }
         
         let underrunCount = 0;
