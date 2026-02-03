@@ -1,0 +1,1112 @@
+namespace MixLink.Core.Network;
+
+/// <summary>
+/// Embedded HTML/JavaScript for the web audio player.
+/// Matches the Mac implementation exactly.
+/// </summary>
+public static class WebPlayerHtml
+{
+    /// <summary>
+    /// Get the HTML content for the web audio player.
+    /// </summary>
+    /// <param name="wsPort">WebSocket/HTTP port to connect to</param>
+    /// <param name="hostIP">IP address of the Windows PC</param>
+    /// <param name="hostName">Name of the PC</param>
+    public static string GetHtml(int wsPort, string hostIP, string hostName)
+    {
+        return $@"<!DOCTYPE html>
+<html lang=""en"">
+<head>
+    <meta charset=""UTF-8"">
+    <meta name=""viewport"" content=""width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover"">
+    <title>Mix Link</title>
+    <link rel=""icon"" href=""data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='none' stroke='%2300d4ff' stroke-width='6'/><polygon points='40,30 40,70 72,50' fill='%2300d4ff'/></svg>"">
+    <style>
+        * {{
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }}
+
+        html {{
+            touch-action: manipulation;
+            -ms-touch-action: manipulation;
+        }}
+
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            padding: 10px;
+            touch-action: manipulation;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            overscroll-behavior: none;
+        }}
+
+        .container {{
+            text-align: center;
+            max-width: 100%;
+            width: 100%;
+            padding: 0 10px;
+            margin-top: -40px;
+        }}
+
+        h1 {{
+            font-size: 2.2rem;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #fff;
+        }}
+
+        .subtitle {{
+            color: #888;
+            margin-bottom: 35px;
+            font-size: 1.2rem;
+        }}
+
+        .play-button {{
+            width: 130px;
+            height: 130px;
+            border-radius: 50%;
+            border: none;
+            background: linear-gradient(135deg, #00d4ff 0%, #00ffd4 100%);
+            cursor: pointer;
+            margin: 0 auto 15px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            box-shadow: 0 0 30px rgba(0, 212, 255, 0.4);
+        }}
+
+        .play-button:hover {{
+            background: linear-gradient(135deg, #00e5ff 0%, #00ffe5 100%);
+            transform: scale(1.05);
+            box-shadow: 0 0 40px rgba(0, 212, 255, 0.6);
+        }}
+
+        .play-button:active {{
+            transform: scale(0.95);
+        }}
+
+        .play-button svg {{
+            width: 55px;
+            height: 55px;
+            fill: #000;
+        }}
+
+        .play-button .play-icon {{
+            margin-left: 10px;
+        }}
+
+        .play-button .pause-icon {{
+            display: none;
+        }}
+
+        .play-button.playing .play-icon {{
+            display: none;
+        }}
+
+        .play-button.playing .pause-icon {{
+            display: block;
+        }}
+
+        .visualizer-container {{
+            width: 100%;
+            height: 120px;
+            margin: 10px 0 15px 0;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 6px;
+        }}
+
+        .viz-bar {{
+            width: 14px;
+            min-height: 6px;
+            background: linear-gradient(to top, #00d4ff, #00ffd4);
+            border-radius: 3px;
+            transition: height 0.05s ease-out;
+        }}
+
+        .hidden {{
+            display: none !important;
+        }}
+
+        .status {{
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 20px;
+        }}
+
+        .status-dot {{
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #666;
+        }}
+
+        .status-dot.connected {{
+            background: #4ade80;
+            box-shadow: 0 0 10px rgba(74, 222, 128, 0.5);
+        }}
+
+        .status-dot.connecting {{
+            background: #fbbf24;
+            animation: pulse 1s infinite;
+        }}
+
+        .status-dot.error {{
+            background: #ef4444;
+        }}
+
+        @keyframes pulse {{
+            0%, 100% {{ opacity: 1; }}
+            50% {{ opacity: 0.5; }}
+        }}
+
+        .status-text {{
+            color: #a0a0a0;
+            font-size: 0.85rem;
+        }}
+
+        .stats {{
+            margin-top: 10px;
+            font-size: 1.1rem;
+            color: #666;
+        }}
+
+        .error-message {{
+            color: #ef4444;
+            margin-top: 20px;
+            font-size: 0.85rem;
+        }}
+
+        .debug-section {{
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px solid #222;
+        }}
+
+        .debug-toggle {{
+            background: none;
+            border: 1px solid #333;
+            color: #666;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            cursor: pointer;
+        }}
+
+        .debug-log {{
+            margin-top: 15px;
+            background: rgba(0,0,0,0.4);
+            border-radius: 8px;
+            padding: 12px;
+            text-align: left;
+            max-height: 150px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.65rem;
+            color: #666;
+        }}
+
+        .debug-log .log-entry {{
+            margin: 2px 0;
+            word-break: break-all;
+        }}
+
+        .debug-log .log-info {{ color: #4ade80; }}
+        .debug-log .log-warn {{ color: #fbbf24; }}
+        .debug-log .log-error {{ color: #ef4444; }}
+
+        .copy-btn {{
+            margin-top: 10px;
+            padding: 6px 12px;
+            background: transparent;
+            border: 1px solid #333;
+            border-radius: 4px;
+            color: #666;
+            font-size: 0.7rem;
+            cursor: pointer;
+        }}
+
+        .reconnect-overlay {{
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s, visibility 0.2s;
+        }}
+
+        .reconnect-overlay.visible {{
+            opacity: 1;
+            visibility: visible;
+        }}
+
+        .spinner {{
+            width: 50px;
+            height: 50px;
+            border: 4px solid #333;
+            border-top-color: #00d4ff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }}
+
+        @keyframes spin {{
+            to {{ transform: rotate(360deg); }}
+        }}
+
+        .reconnect-text {{
+            margin-top: 20px;
+            color: #888;
+            font-size: 1rem;
+        }}
+    </style>
+</head>
+<body>
+    <div class=""container"">
+        <h1>Mix <span style=""color: #00d4ff; font-weight: 700;"">Link</span></h1>
+        <p class=""subtitle"" id=""subtitle"">Stream audio from your Computer.</p>
+
+        <button class=""play-button"" id=""playBtn"" onclick=""togglePlay()"">
+            <svg class=""play-icon"" viewBox=""0 0 24 24"" xmlns=""http://www.w3.org/2000/svg"">
+                <polygon points=""5,3 19,12 5,21""/>
+            </svg>
+            <svg class=""pause-icon"" viewBox=""0 0 24 24"" xmlns=""http://www.w3.org/2000/svg"">
+                <rect x=""5"" y=""3"" width=""4"" height=""18""/>
+                <rect x=""15"" y=""3"" width=""4"" height=""18""/>
+            </svg>
+        </button>
+
+        <div class=""visualizer-container"" id=""visualizer"">
+            <div class=""viz-bar"" id=""bar0""></div>
+            <div class=""viz-bar"" id=""bar1""></div>
+            <div class=""viz-bar"" id=""bar2""></div>
+            <div class=""viz-bar"" id=""bar3""></div>
+            <div class=""viz-bar"" id=""bar4""></div>
+            <div class=""viz-bar"" id=""bar5""></div>
+            <div class=""viz-bar"" id=""bar6""></div>
+            <div class=""viz-bar"" id=""bar7""></div>
+            <div class=""viz-bar"" id=""bar8""></div>
+            <div class=""viz-bar"" id=""bar9""></div>
+            <div class=""viz-bar"" id=""bar10""></div>
+            <div class=""viz-bar"" id=""bar11""></div>
+            <div class=""viz-bar"" id=""bar12""></div>
+            <div class=""viz-bar"" id=""bar13""></div>
+            <div class=""viz-bar"" id=""bar14""></div>
+            <div class=""viz-bar"" id=""bar15""></div>
+        </div>
+
+        <div class=""stats"" id=""statsDisplay"">
+            Packets: <span id=""packets"">0</span> | Buffer: <span id=""buffer"">0ms</span>
+        </div>
+
+        <div class=""error-message"" id=""errorMsg""></div>
+
+        <div style=""display:none"">
+            <span id=""wsStatus"">Not connected</span>
+            <span id=""audioState"">Not started</span>
+            <span id=""sampleRate"">-</span>
+        </div>
+
+        <div class=""debug-section"">
+            <button class=""debug-toggle"" onclick=""toggleDebug()"">Show Debug Log</button>
+            <div class=""debug-log hidden"" id=""debugLog""></div>
+            <button class=""copy-btn hidden"" id=""copyBtn"" onclick=""copyLog()"">Copy Log</button>
+        </div>
+    </div>
+
+    <audio id=""outputAudio"" playsinline style=""display:none""></audio>
+
+    <div class=""reconnect-overlay"" id=""reconnectOverlay"">
+        <div class=""spinner""></div>
+        <div class=""reconnect-text"">Reconnecting...</div>
+    </div>
+
+    <script>
+        const WS_HOST = '{hostIP}';
+        const WS_PORT = {wsPort};
+        const HOST_NAME = '{hostName}';
+
+        let audioContext = null;
+        let gainNode = null;
+        let scriptNode = null;
+        let mediaStreamDest = null;
+        let ws = null;
+        let isPlaying = false;
+        let packetsReceived = 0;
+        let reconnectAttempts = 0;
+
+        let sourceRate = 48000;
+        let outputRate = 48000;
+        let resampleRatio = 1.0;
+        let sourceRateSet = false;
+
+        let BUFFER_SIZE = 48000 * 2;
+        let audioBuffer = new Float32Array(BUFFER_SIZE);
+        let writePos = 0;
+        let readPos = 0;
+        let bufferedSamples = 0;
+
+        const TARGET_BUFFER_MS = 80;
+        const INITIAL_PREBUFFER_MS = 5;
+        const REBUFFER_MS = 45;
+        let targetBufferSamples = 48000 * 2 * (TARGET_BUFFER_MS / 1000);
+        let prebufferSamples = 48000 * 2 * (INITIAL_PREBUFFER_MS / 1000);
+        let rebufferSamples = 48000 * 2 * (REBUFFER_MS / 1000);
+        let isPrebuffering = true;
+        let isInitialStart = true;
+
+        const NUM_BARS = 16;
+        let vizBars = [];
+        let vizLevels = new Array(NUM_BARS).fill(0);
+        let vizAnimFrame = null;
+
+        function initVisualizer() {{
+            vizBars = [];
+            for (let i = 0; i < NUM_BARS; i++) {{
+                vizBars.push(document.getElementById('bar' + i));
+            }}
+        }}
+
+        function updateVisualizer(samples) {{
+            if (!samples || samples.length === 0) return;
+
+            const samplesPerBar = Math.floor(samples.length / NUM_BARS);
+            for (let i = 0; i < NUM_BARS; i++) {{
+                let sum = 0;
+                const start = i * samplesPerBar;
+                for (let j = 0; j < samplesPerBar && (start + j) < samples.length; j++) {{
+                    sum += Math.abs(samples[start + j]);
+                }}
+                const avg = sum / samplesPerBar;
+                vizLevels[i] = vizLevels[i] * 0.7 + avg * 0.3;
+            }}
+        }}
+
+        function animateVisualizer() {{
+            for (let i = 0; i < NUM_BARS; i++) {{
+                if (vizBars[i]) {{
+                    const height = Math.max(6, Math.min(110, vizLevels[i] * 400));
+                    vizBars[i].style.height = height + 'px';
+                }}
+            }}
+            if (isPlaying) {{
+                vizAnimFrame = requestAnimationFrame(animateVisualizer);
+            }}
+        }}
+
+        function resetVisualizer() {{
+            vizLevels.fill(0);
+            for (let i = 0; i < NUM_BARS; i++) {{
+                if (vizBars[i]) {{
+                    vizBars[i].style.height = '6px';
+                }}
+            }}
+            if (vizAnimFrame) {{
+                cancelAnimationFrame(vizAnimFrame);
+                vizAnimFrame = null;
+            }}
+        }}
+
+        function toggleDebug() {{
+            const log = document.getElementById('debugLog');
+            const copyBtn = document.getElementById('copyBtn');
+            log.classList.toggle('hidden');
+            copyBtn.classList.toggle('hidden');
+        }}
+
+        const maxLogEntries = 50;
+        function debugLog(msg, level = 'info') {{
+            const logDiv = document.getElementById('debugLog');
+            const time = new Date().toLocaleTimeString('en-US', {{hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3}});
+            const entry = document.createElement('div');
+            entry.className = 'log-entry log-' + level;
+            entry.textContent = '[' + time + '] ' + msg;
+            logDiv.appendChild(entry);
+
+            while (logDiv.children.length > maxLogEntries) {{
+                logDiv.removeChild(logDiv.firstChild);
+            }}
+
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log('[MixLink] ' + msg);
+        }}
+
+        function updateStatus(status, text) {{
+            const playBtn = document.getElementById('playBtn');
+
+            if (status === 'connected' || isPlaying) {{
+                playBtn.classList.add('playing');
+            }} else {{
+                playBtn.classList.remove('playing');
+            }}
+        }}
+
+        function updateSubtitle(connected, customMessage) {{
+            const subtitle = document.getElementById('subtitle');
+            if (connected) {{
+                const connectedIcon = '<svg style=""width:14px;height:14px;vertical-align:middle;margin-right:6px;"" viewBox=""0 0 24 24"" fill=""none"" stroke=""#4ade80"" stroke-width=""2.5""><path d=""M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71""/><path d=""M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71""/></svg>';
+                subtitle.innerHTML = connectedIcon + 'Connected to <span style=""color: #fff; font-weight: 600;"">' + HOST_NAME + '</span>';
+            }} else {{
+                const disconnectedIcon = '<svg style=""width:14px;height:14px;vertical-align:middle;margin-right:6px;"" viewBox=""0 0 24 24"" fill=""none"" stroke=""#ef4444"" stroke-width=""2.5""><circle cx=""12"" cy=""12"" r=""9""/><line x1=""8"" y1=""8"" x2=""16"" y2=""16""/></svg>';
+                const message = customMessage || 'Not connected to a computer.';
+                subtitle.innerHTML = disconnectedIcon + message;
+            }}
+        }}
+
+        function showError(msg) {{
+            document.getElementById('errorMsg').textContent = msg;
+            debugLog(msg, 'error');
+        }}
+
+        function togglePlay() {{
+            if (isPlaying) {{
+                stopAudio();
+            }} else {{
+                startAudio();
+            }}
+        }}
+
+        async function startAudio() {{
+            try {{
+                showError('');
+                updateStatus('connecting', 'Starting...');
+                debugLog('Starting audio...');
+
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                outputRate = audioContext.sampleRate;
+
+                debugLog('AudioContext created, state: ' + audioContext.state);
+                debugLog('Output rate: ' + outputRate + 'Hz (waiting for source rate from packet)');
+
+                BUFFER_SIZE = Math.ceil(outputRate * 2);
+                audioBuffer = new Float32Array(BUFFER_SIZE);
+                targetBufferSamples = Math.ceil(outputRate * 2 * (TARGET_BUFFER_MS / 1000));
+
+                document.getElementById('audioState').textContent = audioContext.state;
+                document.getElementById('sampleRate').textContent = outputRate + 'Hz (waiting for src)';
+
+                if (audioContext.state === 'suspended') {{
+                    debugLog('Resuming suspended AudioContext...');
+
+                    const resumePromise = audioContext.resume();
+                    const timeoutPromise = new Promise(resolve => setTimeout(resolve, 300));
+
+                    await Promise.race([resumePromise, timeoutPromise]);
+
+                    debugLog('AudioContext state after resume: ' + audioContext.state);
+                    document.getElementById('audioState').textContent = audioContext.state;
+                }}
+
+                mediaStreamDest = audioContext.createMediaStreamDestination();
+                debugLog('MediaStream destination created');
+
+                gainNode = audioContext.createGain();
+                gainNode.connect(mediaStreamDest);
+                debugLog('Gain node created and connected to MediaStream');
+
+                scriptNode = audioContext.createScriptProcessor(512, 0, 2);
+                scriptNode.onaudioprocess = processAudio;
+                scriptNode.connect(gainNode);
+                debugLog('Script processor created (buffer: 512 frames, ~11ms)');
+
+                const outputAudio = document.getElementById('outputAudio');
+                outputAudio.srcObject = mediaStreamDest.stream;
+                outputAudio.play().then(() => {{
+                    debugLog('Audio element playing (silent mode bypass active)');
+                }}).catch(e => {{
+                    debugLog('Audio element play failed: ' + e.message, 'warn');
+                }});
+
+                connectWebSocket();
+
+                isPlaying = true;
+                updateStatus('connected', 'Playing');
+
+                setupMediaSession();
+                updateMediaSessionState(true);
+
+                initVisualizer();
+                animateVisualizer();
+
+            }} catch (err) {{
+                showError('Audio error: ' + err.message);
+                updateStatus('error', 'Error');
+                debugLog('Audio start error: ' + err.message, 'error');
+            }}
+        }}
+
+        function stopAudio() {{
+            debugLog('Stopping audio...');
+
+            try {{
+                const outputAudio = document.getElementById('outputAudio');
+                outputAudio.pause();
+                outputAudio.srcObject = null;
+            }} catch (e) {{}}
+
+            if (ws) {{
+                ws.close();
+                ws = null;
+            }}
+
+            if (httpWatchdog) {{
+                clearInterval(httpWatchdog);
+                httpWatchdog = null;
+            }}
+            if (httpStreamController) {{
+                httpStreamController.abort();
+                httpStreamController = null;
+            }}
+            if (httpStreamReader) {{
+                try {{ httpStreamReader.cancel(); }} catch (e) {{}}
+                httpStreamReader = null;
+            }}
+
+            if (audioContext) {{
+                audioContext.close();
+                audioContext = null;
+            }}
+
+            mediaStreamDest = null;
+
+            isPlaying = false;
+            packetsReceived = 0;
+            bufferedSamples = 0;
+            writePos = 0;
+            readPos = 0;
+            isPrebuffering = true;
+            isInitialStart = true;
+            processCallCount = 0;
+            processStartTime = 0;
+            totalFramesConsumed = 0;
+
+            updateMediaSessionState(false);
+
+            updateStatus('', 'Stopped');
+            updateSubtitle(false);
+            resetVisualizer();
+            document.getElementById('wsStatus').textContent = 'Not connected';
+            document.getElementById('audioState').textContent = 'Stopped';
+            debugLog('Audio stopped');
+        }}
+
+        let wsConnectionTimeout = null;
+        let networkWarmedUp = false;
+
+        async function warmUpNetwork() {{
+            if (networkWarmedUp) {{
+                debugLog('Network already warmed up, skipping');
+                return true;
+            }}
+
+            const httpUrl = 'http://' + WS_HOST + ':19621/health';
+            debugLog('Network warmup: fetching ' + httpUrl);
+            const warmupStart = Date.now();
+
+            try {{
+                const response = await fetch(httpUrl, {{
+                    method: 'GET',
+                    cache: 'no-store'
+                }});
+                const elapsed = Date.now() - warmupStart;
+                networkWarmedUp = true;
+                debugLog('Network warmup SUCCESS in ' + elapsed + 'ms (status: ' + response.status + ')');
+                return true;
+            }} catch (err) {{
+                const elapsed = Date.now() - warmupStart;
+                debugLog('Network warmup FAILED in ' + elapsed + 'ms: ' + err.message, 'warn');
+                return true;
+            }}
+        }}
+
+        let httpStreamReader = null;
+        let httpStreamController = null;
+
+        const isSafari = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
+        const isIOSSafari = isSafari && /iPhone|iPad|iPod/.test(navigator.userAgent);
+
+        async function connectWebSocket() {{
+            await warmUpNetwork();
+
+            const startTime = Date.now();
+
+            if (isIOSSafari) {{
+                debugLog('iOS Safari detected - using HTTP stream', 'info');
+                connectHTTPStream();
+                return;
+            }}
+
+            const url = 'ws://' + WS_HOST + ':' + WS_PORT;
+
+            debugLog('=== CONNECTION ATTEMPT ===');
+            debugLog('URL: ' + url);
+            debugLog('Browser: ' + (isSafari ? 'Safari' : 'Chrome/Other'));
+            debugLog('User-Agent: ' + navigator.userAgent.substring(0, 80));
+            debugLog('Online: ' + navigator.onLine);
+            debugLog('Attempt #' + (reconnectAttempts + 1));
+            document.getElementById('wsStatus').textContent = 'Connecting...';
+
+            try {{
+                debugLog('Creating WebSocket object...');
+                ws = new WebSocket(url);
+                ws.binaryType = 'arraybuffer';
+                debugLog('WebSocket created in ' + (Date.now() - startTime) + 'ms, readyState: ' + ws.readyState);
+
+                const timeout = isSafari ? 2000 : 4000;
+                wsConnectionTimeout = setTimeout(() => {{
+                    if (ws && ws.readyState === 0) {{
+                        const elapsed = Date.now() - startTime;
+                        debugLog('TIMEOUT after ' + elapsed + 'ms (readyState still 0)', 'warn');
+                        ws.close();
+                    }}
+                }}, timeout);
+
+                ws.onopen = () => {{
+                    clearTimeout(wsConnectionTimeout);
+                    const elapsed = Date.now() - startTime;
+                    debugLog('WebSocket CONNECTED in ' + elapsed + 'ms!', 'info');
+                    document.getElementById('wsStatus').textContent = 'Connected (WebSocket)';
+                    updateStatus('connected', 'Connected - Waiting for audio');
+                    updateSubtitle(true);
+                    reconnectAttempts = 0;
+                    document.getElementById('reconnectOverlay').classList.remove('visible');
+                }};
+
+                ws.onclose = (event) => {{
+                    clearTimeout(wsConnectionTimeout);
+                    const elapsed = Date.now() - startTime;
+                    debugLog('CLOSED after ' + elapsed + 'ms - code: ' + event.code + ', wasClean: ' + event.wasClean, 'warn');
+                    document.getElementById('wsStatus').textContent = 'Disconnected';
+
+                    if (isPlaying) {{
+                        reconnectAttempts++;
+                        if (reconnectAttempts <= 2) {{
+                            debugLog('Reconnect ' + reconnectAttempts + '/2...', 'info');
+                            document.getElementById('reconnectOverlay').classList.add('visible');
+                            updateStatus('connecting', 'Reconnecting...');
+                            setTimeout(connectWebSocket, 1000);
+                        }} else {{
+                            debugLog('No connection found', 'warn');
+                            document.getElementById('reconnectOverlay').classList.remove('visible');
+                            updateSubtitle(false, 'No connection found. Please check computer.');
+                            stopAudio();
+                        }}
+                    }}
+                }};
+
+                ws.onerror = (err) => {{
+                    const elapsed = Date.now() - startTime;
+                    debugLog('ERROR after ' + elapsed + 'ms - readyState: ' + (ws ? ws.readyState : 'null'), 'error');
+                    document.getElementById('wsStatus').textContent = 'Error';
+                    updateStatus('error', 'Connection error');
+                }};
+
+                ws.onmessage = (event) => {{
+                    handleAudioPacket(event.data);
+                }};
+            }} catch (err) {{
+                debugLog('WebSocket creation EXCEPTION: ' + err.message, 'error');
+            }}
+        }}
+
+        let httpWatchdog = null;
+        let lastPacketTime = 0;
+
+        async function connectHTTPStream() {{
+            if (httpStreamReader) {{
+                try {{
+                    await httpStreamReader.cancel();
+                }} catch (e) {{}}
+                httpStreamReader = null;
+            }}
+            if (httpWatchdog) {{
+                clearInterval(httpWatchdog);
+                httpWatchdog = null;
+            }}
+
+            const url = 'http://' + WS_HOST + ':' + WS_PORT + '/stream';
+            debugLog('=== HTTP STREAM ===');
+            debugLog('URL: ' + url);
+            document.getElementById('wsStatus').textContent = 'Connecting...';
+
+            try {{
+                const controller = new AbortController();
+                httpStreamController = controller;
+
+                const response = await fetch(url, {{
+                    method: 'GET',
+                    cache: 'no-store',
+                    signal: controller.signal
+                }});
+
+                if (!response.ok) {{
+                    throw new Error('HTTP ' + response.status);
+                }}
+
+                debugLog('HTTP stream connected!', 'info');
+                document.getElementById('wsStatus').textContent = 'Connected';
+                updateStatus('connected', 'Connected - Waiting for audio');
+                updateSubtitle(true);
+                reconnectAttempts = 0;
+                document.getElementById('reconnectOverlay').classList.remove('visible');
+                lastPacketTime = Date.now();
+
+                httpWatchdog = setInterval(() => {{
+                    const staleDuration = Date.now() - lastPacketTime;
+
+                    if (isPlaying && staleDuration > 1000) {{
+                        document.getElementById('reconnectOverlay').classList.add('visible');
+                        updateStatus('connecting', 'Reconnecting...');
+                    }}
+
+                    if (isPlaying && staleDuration > 2000) {{
+                        debugLog('Stream stale - no data for 2s', 'warn');
+                        clearInterval(httpWatchdog);
+                        httpWatchdog = null;
+                        if (httpStreamController) {{
+                            httpStreamController.abort();
+                        }}
+                        handleStreamDisconnect();
+                    }}
+                }}, 500);
+
+                const reader = response.body.getReader();
+                httpStreamReader = reader;
+                let buffer = new Uint8Array(0);
+
+                while (isPlaying) {{
+                    const {{ done, value }} = await reader.read();
+                    if (done) {{
+                        debugLog('HTTP stream ended', 'warn');
+                        break;
+                    }}
+
+                    lastPacketTime = Date.now();
+
+                    const newBuffer = new Uint8Array(buffer.length + value.length);
+                    newBuffer.set(buffer);
+                    newBuffer.set(value, buffer.length);
+                    buffer = newBuffer;
+
+                    while (buffer.length >= 16) {{
+                        const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.length);
+                        const frameCount = view.getUint16(14, true);
+                        const channels = view.getUint16(12, true);
+                        const packetSize = 16 + (frameCount * channels * 4);
+
+                        if (buffer.length >= packetSize) {{
+                            const packetData = new ArrayBuffer(packetSize);
+                            new Uint8Array(packetData).set(buffer.subarray(0, packetSize));
+                            handleAudioPacket(packetData);
+                            buffer = buffer.slice(packetSize);
+                        }} else {{
+                            break;
+                        }}
+                    }}
+                }}
+
+                handleStreamDisconnect();
+
+            }} catch (err) {{
+                if (err.name === 'AbortError') {{
+                    debugLog('HTTP stream aborted', 'info');
+                    return;
+                }}
+                debugLog('HTTP stream error: ' + err.message, 'error');
+                handleStreamDisconnect();
+            }}
+        }}
+
+        function handleStreamDisconnect() {{
+            if (httpWatchdog) {{
+                clearInterval(httpWatchdog);
+                httpWatchdog = null;
+            }}
+
+            if (isPlaying) {{
+                reconnectAttempts++;
+                if (reconnectAttempts <= 2) {{
+                    debugLog('Reconnect ' + reconnectAttempts + '/2...', 'info');
+                    document.getElementById('reconnectOverlay').classList.add('visible');
+                    updateStatus('connecting', 'Reconnecting...');
+                    setTimeout(connectHTTPStream, 1000);
+                }} else {{
+                    debugLog('No connection found', 'warn');
+                    document.getElementById('reconnectOverlay').classList.remove('visible');
+                    updateSubtitle(false, 'No connection found. Please check computer.');
+                    stopAudio();
+                }}
+            }}
+        }}
+
+        function handleAudioPacket(data) {{
+            packetsReceived++;
+
+            if (packetsReceived === 1) {{
+                debugLog('First packet received! Size: ' + data.byteLength + ' bytes');
+            }}
+
+            const view = new DataView(data);
+            const sequence = view.getUint32(0, true);
+            const timestamp = view.getUint32(4, true);
+            const packetSampleRate = view.getUint32(8, true);
+            const channels = view.getUint16(12, true);
+            const frameCount = view.getUint16(14, true);
+
+            if (!sourceRateSet && packetSampleRate > 0) {{
+                sourceRate = packetSampleRate;
+                sourceRateSet = true;
+                resampleRatio = outputRate / sourceRate;
+                debugLog('Source rate set from packet: ' + sourceRate + 'Hz, Ratio: ' + resampleRatio.toFixed(4));
+                document.getElementById('sampleRate').textContent = outputRate + 'Hz (src:' + sourceRate + ')';
+            }}
+
+            if (packetsReceived === 1) {{
+                debugLog('Packet header: seq=' + sequence + ', rate=' + packetSampleRate + ', ch=' + channels + ', frames=' + frameCount);
+            }}
+
+            const audioData = new Float32Array(data, 16);
+            const inputFrames = audioData.length / 2;
+
+            if (packetsReceived === 1) {{
+                debugLog('Audio samples: ' + audioData.length + ' (' + inputFrames + ' frames)');
+                debugLog('First samples: ' + audioData.slice(0, 8).map(x => x.toFixed(4)).join(', '));
+            }}
+
+            if (Math.abs(resampleRatio - 1.0) > 0.001) {{
+                const outputFrames = Math.floor(inputFrames * resampleRatio);
+
+                for (let outFrame = 0; outFrame < outputFrames; outFrame++) {{
+                    const inFrameF = outFrame / resampleRatio;
+                    const inFrame0 = Math.floor(inFrameF);
+                    const inFrame1 = Math.min(inFrame0 + 1, inputFrames - 1);
+                    const frac = inFrameF - inFrame0;
+
+                    const l0 = audioData[inFrame0 * 2];
+                    const l1 = audioData[inFrame1 * 2];
+                    const left = l0 + (l1 - l0) * frac;
+
+                    const r0 = audioData[inFrame0 * 2 + 1];
+                    const r1 = audioData[inFrame1 * 2 + 1];
+                    const right = r0 + (r1 - r0) * frac;
+
+                    audioBuffer[writePos] = left;
+                    writePos = (writePos + 1) % BUFFER_SIZE;
+                    audioBuffer[writePos] = right;
+                    writePos = (writePos + 1) % BUFFER_SIZE;
+                }}
+
+                bufferedSamples = Math.min(bufferedSamples + outputFrames * 2, BUFFER_SIZE);
+            }} else {{
+                for (let i = 0; i < audioData.length; i++) {{
+                    audioBuffer[writePos] = audioData[i];
+                    writePos = (writePos + 1) % BUFFER_SIZE;
+                }}
+                bufferedSamples = Math.min(bufferedSamples + audioData.length, BUFFER_SIZE);
+            }}
+
+            if (packetsReceived % 50 === 0) {{
+                const bufferMs = Math.round((bufferedSamples / 2) / outputRate * 1000);
+                document.getElementById('packets').textContent = packetsReceived;
+                document.getElementById('buffer').textContent = bufferMs + 'ms';
+
+                if (packetsReceived % 200 === 0) {{
+                    debugLog('Stats: packets=' + packetsReceived + ', buffer=' + bufferMs + 'ms');
+                }}
+            }}
+        }}
+
+        let underrunCount = 0;
+        let processCallCount = 0;
+        let processStartTime = 0;
+        let totalFramesConsumed = 0;
+
+        function processAudio(e) {{
+            const outputL = e.outputBuffer.getChannelData(0);
+            const outputR = e.outputBuffer.getChannelData(1);
+            const frameCount = outputL.length;
+
+            processCallCount++;
+            if (processStartTime === 0) {{
+                processStartTime = performance.now();
+            }}
+
+            const samplesNeeded = frameCount * 2;
+
+            const currentThreshold = isInitialStart ? prebufferSamples : rebufferSamples;
+
+            if (isPrebuffering) {{
+                if (bufferedSamples < currentThreshold) {{
+                    for (let i = 0; i < frameCount; i++) {{
+                        outputL[i] = 0;
+                        outputR[i] = 0;
+                    }}
+                    if (packetsReceived > 0 && packetsReceived % 200 === 0) {{
+                        const pct = Math.round((bufferedSamples / currentThreshold) * 100);
+                        const mode = isInitialStart ? 'Starting' : 'Rebuffering';
+                        debugLog(mode + ': ' + pct + '% (' + Math.round(bufferedSamples/2/outputRate*1000) + 'ms)');
+                    }}
+                    return;
+                }} else {{
+                    isPrebuffering = false;
+                    isInitialStart = false;
+                    debugLog('Playback started with ' + Math.round(bufferedSamples/2/outputRate*1000) + 'ms buffer', 'info');
+                }}
+            }}
+
+            if (bufferedSamples < samplesNeeded) {{
+                underrunCount++;
+                isPrebuffering = true;
+                debugLog('Buffer underrun #' + underrunCount + ', need ' + samplesNeeded + ', have ' + bufferedSamples + ' - rebuffering...', 'warn');
+                for (let i = 0; i < frameCount; i++) {{
+                    outputL[i] = 0;
+                    outputR[i] = 0;
+                }}
+                return;
+            }}
+
+            for (let i = 0; i < frameCount; i++) {{
+                outputL[i] = audioBuffer[readPos];
+                readPos = (readPos + 1) % BUFFER_SIZE;
+
+                outputR[i] = audioBuffer[readPos];
+                readPos = (readPos + 1) % BUFFER_SIZE;
+            }}
+
+            bufferedSamples -= samplesNeeded;
+            totalFramesConsumed += frameCount;
+
+            updateVisualizer(outputL);
+        }}
+
+        function setVolume(value) {{
+            if (gainNode) {{
+                gainNode.gain.value = value / 100;
+                debugLog('Volume set to ' + value + '%');
+            }}
+        }}
+
+        function copyLog() {{
+            const logDiv = document.getElementById('debugLog');
+            const entries = Array.from(logDiv.querySelectorAll('.log-entry')).map(e => e.textContent);
+            const text = entries.join('\n');
+
+            if (navigator.clipboard) {{
+                navigator.clipboard.writeText(text).then(() => {{
+                    debugLog('Log copied to clipboard!');
+                }}).catch(err => {{
+                    debugLog('Copy failed: ' + err, 'error');
+                    fallbackCopy(text);
+                }});
+            }} else {{
+                fallbackCopy(text);
+            }}
+        }}
+
+        function fallbackCopy(text) {{
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {{
+                document.execCommand('copy');
+                debugLog('Log copied! (fallback)');
+            }} catch (e) {{
+                debugLog('Copy failed', 'error');
+            }}
+            document.body.removeChild(textarea);
+        }}
+
+        debugLog('Mix Link Web Player loaded');
+        debugLog('Will connect to ws://' + WS_HOST + ':' + WS_PORT);
+
+        document.addEventListener('visibilitychange', () => {{
+            if (!isPlaying || !gainNode) return;
+
+            if (document.hidden) {{
+                debugLog('Tab hidden - muting audio');
+                gainNode.gain.value = 0;
+            }} else {{
+                debugLog('Tab visible - unmuting audio');
+                gainNode.gain.value = 1;
+            }}
+        }});
+
+        if ('wakeLock' in navigator) {{
+            navigator.wakeLock.request('screen').catch(() => {{}});
+        }}
+
+        document.addEventListener('gesturestart', function(e) {{ e.preventDefault(); }}, {{ passive: false }});
+        document.addEventListener('gesturechange', function(e) {{ e.preventDefault(); }}, {{ passive: false }});
+        document.addEventListener('gestureend', function(e) {{ e.preventDefault(); }}, {{ passive: false }});
+
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', function(e) {{
+            const now = Date.now();
+            if (now - lastTouchEnd <= 300) {{ e.preventDefault(); }}
+            lastTouchEnd = now;
+        }}, {{ passive: false }});
+
+        function setupMediaSession() {{
+            if ('mediaSession' in navigator) {{
+                navigator.mediaSession.metadata = new MediaMetadata({{
+                    title: 'Mix Link',
+                    artist: 'Streaming from PC',
+                    album: 'System Audio',
+                    artwork: [
+                        {{ src: 'data:image/svg+xml,<svg xmlns=""http://www.w3.org/2000/svg"" viewBox=""0 0 512 512""><rect fill=""%23000"" width=""512"" height=""512""/><circle cx=""256"" cy=""256"" r=""180"" fill=""none"" stroke=""%2300d4ff"" stroke-width=""24""/><polygon points=""220,160 220,352 360,256"" fill=""%2300d4ff""/></svg>', sizes: '512x512', type: 'image/svg+xml' }}
+                    ]
+                }});
+
+                navigator.mediaSession.setActionHandler('play', () => {{
+                    debugLog('Media Session: play', 'info');
+                    if (gainNode) gainNode.gain.value = 1;
+                    navigator.mediaSession.playbackState = 'playing';
+                    document.getElementById('playBtn').classList.add('playing');
+                }});
+
+                navigator.mediaSession.setActionHandler('pause', () => {{
+                    debugLog('Media Session: pause', 'info');
+                    if (gainNode) gainNode.gain.value = 0;
+                    navigator.mediaSession.playbackState = 'paused';
+                    document.getElementById('playBtn').classList.remove('playing');
+                }});
+
+                debugLog('Media Session API configured');
+            }}
+        }}
+
+        function updateMediaSessionState(playing) {{
+            if ('mediaSession' in navigator) {{
+                navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
+            }}
+        }}
+    </script>
+</body>
+</html>";
+    }
+}

@@ -1,0 +1,47 @@
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# NuGet
+*.nupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nuget.props
+*.nuget.targets
+
+# MSBuild
+*.log
+msbuild.binlog
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# User-specific files
+*.rsuser
+*.rsuser/
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Application files
+*.ico
+
+# Publish output
+publish/
