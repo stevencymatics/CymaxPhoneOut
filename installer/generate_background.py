@@ -2,25 +2,26 @@
 """
 Generate DMG installer background image with vertical layout.
 App at top, downward arrow, Applications folder at bottom.
-DARK background, no highlight box - just arrow.
+DARK background with arrow and subtle text label.
 """
 
 import sys
 import os
 
+
 def generate_background(output_path, width, height, app_x, app_y, apps_x, apps_y, win_width, win_height):
     """Generate the installer background image with vertical layout."""
 
     try:
-        from PIL import Image, ImageDraw
+        from PIL import Image, ImageDraw, ImageFont
         generate_with_pil(output_path, width, height, app_x, app_y, apps_x, apps_y, win_width, win_height)
     except ImportError:
         generate_background_native(output_path, width, height, app_x, app_y, apps_x, apps_y, win_width, win_height)
 
 
 def generate_with_pil(output_path, width, height, app_x, app_y, apps_x, apps_y, win_width, win_height):
-    """Generate background using PIL - dark background with smooth arrow."""
-    from PIL import Image, ImageDraw
+    """Generate background using PIL - dark background with smooth arrow and text."""
+    from PIL import Image, ImageDraw, ImageFont
 
     # Pure black background
     bg_color = (0, 0, 0)
@@ -53,6 +54,36 @@ def generate_with_pil(output_path, width, height, app_x, app_y, apps_x, apps_y, 
     ]
     draw.polygon(arrow_head, fill=arrow_color)
 
+    # Draw "Drag to Applications" text below the Applications icon area
+    text_color = (100, 105, 115)
+    text_y = (apps_y + 75) * scale
+    text_x = (win_width // 2) * scale
+
+    # Try to use a system font, fall back to default
+    font = None
+    font_size = 13 * scale
+    for font_path in [
+        "/System/Library/Fonts/SFNSText.ttf",
+        "/System/Library/Fonts/Helvetica.ttc",
+        "/System/Library/Fonts/HelveticaNeue.ttc",
+        "/Library/Fonts/Arial.ttf",
+    ]:
+        if os.path.exists(font_path):
+            try:
+                font = ImageFont.truetype(font_path, font_size)
+                break
+            except (IOError, OSError):
+                continue
+
+    label = "Drag to Applications"
+    if font:
+        bbox = draw.textbbox((0, 0), label, font=font)
+        tw = bbox[2] - bbox[0]
+        draw.text((text_x - tw // 2, text_y), label, fill=text_color, font=font)
+    else:
+        # Default font - approximate centering
+        draw.text((text_x - 80 * scale, text_y), label, fill=text_color)
+
     # Scale down with high-quality resampling for smooth edges
     img = img.resize((width, height), Image.LANCZOS)
 
@@ -69,6 +100,7 @@ def generate_background_native(output_path, width, height, app_x, app_y, apps_x,
     arrow_start_y = app_y + 95
     arrow_end_y = apps_y - 55
     shaft_end_y = arrow_end_y - 2
+    text_y = apps_y + 80
 
     # Create SVG with pure black background
     svg_content = f'''<?xml version="1.0" encoding="UTF-8"?>
@@ -78,11 +110,15 @@ def generate_background_native(output_path, width, height, app_x, app_y, apps_x,
 
   <!-- Arrow shaft -->
   <rect x="{arrow_x - 2}" y="{arrow_start_y}" width="4" height="{max(0, shaft_end_y - arrow_start_y)}"
-        fill="#787d87"/>
+        fill="#8c919b"/>
 
   <!-- Arrow head (pointing down) -->
   <polygon points="{arrow_x},{shaft_end_y + 16} {arrow_x - 11},{shaft_end_y} {arrow_x + 11},{shaft_end_y}"
-           fill="#787d87"/>
+           fill="#8c919b"/>
+
+  <!-- Label text -->
+  <text x="{arrow_x}" y="{text_y}" fill="#646973" font-family="Helvetica, Arial, sans-serif"
+        font-size="13" text-anchor="middle">Drag to Applications</text>
 </svg>'''
 
     # Write SVG

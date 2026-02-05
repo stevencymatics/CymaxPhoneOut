@@ -87,6 +87,7 @@ success "Generated background image"
 echo "Creating volume icon..."
 APP_ICON_DIR="$PROJECT_ROOT/mac/CymaxPhoneOutMenubar/CymaxPhoneOutMenubar/Assets.xcassets/AppIcon.appiconset"
 VOLUME_ICON="$DMG_TEMP/.VolumeIcon.icns"
+HAS_VOLUME_ICON=false
 
 if [ -f "$APP_ICON_DIR/icon_1024x1024.png" ]; then
     # Create iconset directory
@@ -106,8 +107,12 @@ if [ -f "$APP_ICON_DIR/icon_1024x1024.png" ]; then
     cp "$APP_ICON_DIR/icon_1024x1024.png" "$ICONSET_DIR/icon_512x512@2x.png"
 
     # Convert to icns
-    iconutil -c icns "$ICONSET_DIR" -o "$VOLUME_ICON"
-    success "Created volume icon"
+    if iconutil -c icns "$ICONSET_DIR" -o "$VOLUME_ICON" 2>/dev/null; then
+        HAS_VOLUME_ICON=true
+        success "Created volume icon"
+    else
+        warn "iconutil failed, skipping volume icon"
+    fi
 else
     warn "App icon not found, skipping volume icon"
 fi
@@ -131,6 +136,7 @@ MOUNT_DIR="/Volumes/$VOLUME_NAME"
 # Unmount if already mounted
 if [ -d "$MOUNT_DIR" ]; then
     hdiutil detach "$MOUNT_DIR" -force 2>/dev/null || true
+    sleep 1
 fi
 
 hdiutil attach "$TEMP_DMG" -mountpoint "$MOUNT_DIR" -nobrowse
@@ -140,12 +146,24 @@ if [ -f "$MOUNT_DIR/.VolumeIcon.icns" ]; then
     SetFile -a C "$MOUNT_DIR" 2>/dev/null || true
 fi
 
+# Build the hidden-items positioning block conditionally
+POSITION_HIDDEN_ITEMS=""
+if [ "$HAS_VOLUME_ICON" = true ]; then
+    POSITION_HIDDEN_ITEMS="
+        try
+            set position of item \".VolumeIcon.icns\" of container window to {250, $HIDDEN_Y}
+        end try"
+fi
+
 # Apply visual styling using AppleScript
+# Run twice to ensure .DS_Store is reliably written
 echo "Applying visual styling..."
 osascript <<EOF
 tell application "Finder"
     tell disk "$VOLUME_NAME"
         open
+        delay 1
+
         set current view of container window to icon view
         set toolbar visible of container window to false
         set statusbar visible of container window to false
@@ -154,28 +172,62 @@ tell application "Finder"
         set theViewOptions to icon view options of container window
         set arrangement of theViewOptions to not arranged
         set icon size of theViewOptions to $ICON_SIZE
-        set background picture of theViewOptions to file ".background:installer_background.png"
+
+        -- Set background picture using disk-relative path
+        try
+            set background picture of theViewOptions to file ".background:installer_background.png"
+        end try
 
         -- Position visible icons (app and Applications)
         set position of item "$APP_NAME.app" of container window to {$APP_X, $APP_Y}
         set position of item "Applications" of container window to {$APPS_X, $APPS_Y}
 
         -- Position hidden files far below visible area
-        set position of item ".background" of container window to {100, $HIDDEN_Y}
-        set position of item ".VolumeIcon.icns" of container window to {250, $HIDDEN_Y}
+        try
+            set position of item ".background" of container window to {100, $HIDDEN_Y}
+        end try
+        $POSITION_HIDDEN_ITEMS
 
         close
         open
 
+        -- Re-apply positions after reopen to ensure .DS_Store persistence
+        set current view of container window to icon view
+        set toolbar visible of container window to false
+        set statusbar visible of container window to false
+        set bounds of container window to {100, 100, $((100 + WINDOW_WIDTH)), $((100 + WINDOW_HEIGHT))}
+
+        set theViewOptions to icon view options of container window
+        set arrangement of theViewOptions to not arranged
+        set icon size of theViewOptions to $ICON_SIZE
+
+        try
+            set background picture of theViewOptions to file ".background:installer_background.png"
+        end try
+
+        set position of item "$APP_NAME.app" of container window to {$APP_X, $APP_Y}
+        set position of item "Applications" of container window to {$APPS_X, $APPS_Y}
+
+        try
+            set position of item ".background" of container window to {100, $HIDDEN_Y}
+        end try
+        $POSITION_HIDDEN_ITEMS
+
         update without registering applications
-        delay 2
+        delay 5
+
+        close
     end tell
 end tell
 EOF
 success "Applied visual styling"
 
+# Extra wait for Finder to flush .DS_Store to disk
+sleep 3
+
 # Sync and unmount
 sync
+sleep 1
 hdiutil detach "$MOUNT_DIR"
 success "Unmounted DMG"
 
@@ -228,7 +280,9 @@ echo "  Size:   $DMG_SIZE"
 echo ""
 echo "  The installer includes:"
 echo "    - $APP_NAME.app (top)"
-echo "    - Applications folder (bottom with highlight)"
+echo "    - Applications folder (bottom)"
 echo "    - Downward arrow"
+if [ "$HAS_VOLUME_ICON" = true ]; then
 echo "    - Custom volume icon"
+fi
 echo ""

@@ -73,6 +73,11 @@ class AppState: ObservableObject {
         log("Ready to stream system audio to your phone")
         updateQRCode()
         setupSleepWakeObservers()
+
+        // Check permission immediately so the walkthrough shows on first open
+        if !SystemAudioCapture.hasPermission() {
+            needsPermission = true
+        }
     }
     
     private func setupSleepWakeObservers() {
