@@ -247,18 +247,6 @@ class AppState: ObservableObject {
     private func performHealthCheck() {
         guard isServerRunning else { return }
 
-        // CRITICAL: Check if permission was revoked while running
-        Task {
-            let hasPermission = await SystemAudioCapture.checkPermissionAsync()
-            await MainActor.run {
-                if !hasPermission {
-                    self.log("Permission was revoked!", level: .error)
-                    self.resetToInitialState(reason: "Permission revoked")
-                    self.needsPermission = true
-                }
-            }
-        }
-        
         // Check if audio capture is still working
         if isCaptureActive && webClientsConnected > 0 {
             // If we have clients but packets aren't increasing, something's wrong

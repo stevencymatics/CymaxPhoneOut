@@ -81,7 +81,7 @@ class SystemAudioCapture: NSObject, SCStreamDelegate, SCStreamOutput {
         
         onStatusUpdate?("Setting up audio capture...")
 
-        // Get available content — this will fail with an auth error if permission isn't granted
+        // Try to get available content — triggers permission prompt if needed
         let availableContent: SCShareableContent
         do {
             availableContent = try await SCShareableContent.excludingDesktopWindows(
@@ -89,8 +89,25 @@ class SystemAudioCapture: NSObject, SCStreamDelegate, SCStreamOutput {
                 onScreenWindowsOnly: false
             )
         } catch {
-            // On macOS 15+, permission errors come through here
-            throw CaptureError.notAuthorized
+            print("SystemAudioCapture: SCShareableContent failed: \(error)")
+            print("SystemAudioCapture: Requesting permission via CGRequestScreenCaptureAccess...")
+            // Try triggering the system permission prompt as fallback
+            let granted = CGRequestScreenCaptureAccess()
+            print("SystemAudioCapture: CGRequestScreenCaptureAccess returned: \(granted)")
+            if granted {
+                // Permission was just granted — retry
+                do {
+                    availableContent = try await SCShareableContent.excludingDesktopWindows(
+                        false,
+                        onScreenWindowsOnly: false
+                    )
+                } catch {
+                    print("SystemAudioCapture: Retry also failed: \(error)")
+                    throw CaptureError.notAuthorized
+                }
+            } else {
+                throw CaptureError.notAuthorized
+            }
         }
         
         // We need at least one display to create a stream
@@ -146,44 +163,53 @@ class SystemAudioCapture: NSObject, SCStreamDelegate, SCStreamOutput {
     }
     
     // MARK: - SCStreamOutput
-    
-    // Track actual sample rate from audio buffers
+
+    // Track actual audio format from buffers
     private var detectedSampleRate: Int = 48000
+    private var detectedChannels: Int = 2
+    private var isNonInterleaved: Bool = true
     private var hasLoggedFormat = false
     private var bufferCount = 0
     private var totalSamplesReceived = 0
-    
+    private var zeroBufferCount = 0
+
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
         // Only process audio
         guard type == .audio else { return }
-        
+
         bufferCount += 1
 
-        // Get the ACTUAL sample rate from the format description
+        // Read the ACTUAL format from the buffer (don't assume anything)
         if let formatDescription = CMSampleBufferGetFormatDescription(sampleBuffer),
            let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(formatDescription)?.pointee {
             let actualRate = Int(asbd.mSampleRate)
             let actualChannels = Int(asbd.mChannelsPerFrame)
-            
-            // Log format once
+            let nonInterleaved = (asbd.mFormatFlags & kAudioFormatFlagIsNonInterleaved) != 0
+
             if !hasLoggedFormat {
                 hasLoggedFormat = true
-                print("SystemAudioCapture: Actual format - rate=\(actualRate)Hz, channels=\(actualChannels)")
+                let layout = nonInterleaved ? "non-interleaved" : "interleaved"
+                print("SystemAudioCapture: Format - rate=\(actualRate)Hz, ch=\(actualChannels), \(layout), flags=0x\(String(asbd.mFormatFlags, radix: 16))")
                 if actualRate != sampleRate {
-                    print("SystemAudioCapture: ⚠️ Sample rate mismatch! Requested \(sampleRate)Hz but got \(actualRate)Hz")
+                    print("SystemAudioCapture: Sample rate mismatch: requested \(sampleRate)Hz, got \(actualRate)Hz")
+                }
+                if actualChannels != channels {
+                    print("SystemAudioCapture: Channel count mismatch: requested \(channels), got \(actualChannels)")
                 }
             }
-            
+
             detectedSampleRate = actualRate
+            detectedChannels = actualChannels
+            isNonInterleaved = nonInterleaved
         }
-        
+
         // Get audio buffer
         guard let audioBuffer = sampleBuffer.dataBuffer else { return }
-        
-        // Get the audio data
+
+        // Get the raw audio data
         var length = 0
         var dataPointer: UnsafeMutablePointer<Int8>?
-        
+
         let status = CMBlockBufferGetDataPointer(
             audioBuffer,
             atOffset: 0,
@@ -191,32 +217,62 @@ class SystemAudioCapture: NSObject, SCStreamDelegate, SCStreamOutput {
             totalLengthOut: &length,
             dataPointerOut: &dataPointer
         )
-        
+
         guard status == kCMBlockBufferNoErr, let dataPointer = dataPointer, length > 0 else {
             return
         }
-        
-        // Convert to Float32 samples
-        // ScreenCaptureKit outputs Float32 NON-INTERLEAVED (all L samples, then all R samples)
-        let floatPointer = UnsafeRawPointer(dataPointer).assumingMemoryBound(to: Float.self)
-        let sampleCount = length / MemoryLayout<Float>.size
-        let frameCount = sampleCount / channels  // frames = total samples / channels
-        
-        totalSamplesReceived += sampleCount
 
-        // Convert from NON-INTERLEAVED to INTERLEAVED format
-        // Input:  [L0, L1, L2, ..., L(n-1), R0, R1, R2, ..., R(n-1)]
-        // Output: [L0, R0, L1, R1, L2, R2, ..., L(n-1), R(n-1)]
-        var interleavedSamples = [Float](repeating: 0, count: sampleCount)
-        for frame in 0..<frameCount {
-            let leftSample = floatPointer[frame]                    // Left channel: first half
-            let rightSample = floatPointer[frameCount + frame]      // Right channel: second half
-            interleavedSamples[frame * 2] = leftSample
-            interleavedSamples[frame * 2 + 1] = rightSample
+        let floatPointer = UnsafeRawPointer(dataPointer).assumingMemoryBound(to: Float.self)
+        let totalFloats = length / MemoryLayout<Float>.size
+
+        guard totalFloats > 0 && detectedChannels > 0 else { return }
+
+        let actualCh = detectedChannels
+        let frameCount = totalFloats / actualCh
+
+        totalSamplesReceived += totalFloats
+
+        // Build interleaved stereo output regardless of source format
+        let outputSampleCount = frameCount * 2 // always output stereo interleaved
+        var interleavedSamples = [Float](repeating: 0, count: outputSampleCount)
+
+        if isNonInterleaved {
+            // Non-interleaved: [all ch0 samples][all ch1 samples][...]
+            for frame in 0..<frameCount {
+                let left = floatPointer[frame]
+                let right = actualCh >= 2 ? floatPointer[frameCount + frame] : left
+                interleavedSamples[frame * 2] = left
+                interleavedSamples[frame * 2 + 1] = right
+            }
+        } else {
+            // Interleaved: [ch0, ch1, ch0, ch1, ...] or [ch0, ch1, ch2, ..., ch0, ch1, ch2, ...]
+            for frame in 0..<frameCount {
+                let left = floatPointer[frame * actualCh]
+                let right = actualCh >= 2 ? floatPointer[frame * actualCh + 1] : left
+                interleavedSamples[frame * 2] = left
+                interleavedSamples[frame * 2 + 1] = right
+            }
         }
-        
-        // Call the handler with INTERLEAVED samples and the ACTUAL detected sample rate
-        onAudioSamples?(interleavedSamples, detectedSampleRate, channels)
+
+        // Detect all-zero audio (log periodically for debugging)
+        var hasNonZero = false
+        for i in stride(from: 0, to: min(interleavedSamples.count, 200), by: 1) {
+            if interleavedSamples[i] != 0 {
+                hasNonZero = true
+                break
+            }
+        }
+        if !hasNonZero {
+            zeroBufferCount += 1
+            if zeroBufferCount == 100 {
+                print("SystemAudioCapture: Warning - 100 consecutive zero-audio buffers (check audio device)")
+                onStatusUpdate?("No audio detected - check output device")
+            }
+        } else {
+            zeroBufferCount = 0
+        }
+
+        onAudioSamples?(interleavedSamples, detectedSampleRate, 2)
     }
     
     // MARK: - SCStreamDelegate

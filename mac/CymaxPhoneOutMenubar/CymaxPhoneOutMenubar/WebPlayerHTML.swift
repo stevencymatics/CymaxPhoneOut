@@ -424,18 +424,23 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
         let vizLevels = new Array(NUM_BARS).fill(0);
         let vizAnimFrame = null;
         
+        let vizUpdateCount = 0;
         function initVisualizer() {
             vizBars = [];
             for (let i = 0; i < NUM_BARS; i++) {
-                vizBars.push(document.getElementById('bar' + i));
+                const el = document.getElementById('bar' + i);
+                vizBars.push(el);
             }
+            debugLog('Visualizer init: found ' + vizBars.filter(b => b).length + '/' + NUM_BARS + ' bars');
         }
-        
+
         function updateVisualizer(samples) {
             if (!samples || samples.length === 0) return;
-            
+            vizUpdateCount++;
+
             // Calculate RMS for different frequency bands (simplified)
             const samplesPerBar = Math.floor(samples.length / NUM_BARS);
+            if (samplesPerBar === 0) return;
             for (let i = 0; i < NUM_BARS; i++) {
                 let sum = 0;
                 const start = i * samplesPerBar;
@@ -446,21 +451,48 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
                 // Smooth the levels
                 vizLevels[i] = vizLevels[i] * 0.7 + avg * 0.3;
             }
+
+            // Log periodically so we can see what's happening
+            if (vizUpdateCount % 200 === 1) {
+                const maxLevel = Math.max(...vizLevels);
+                const maxSample = samples.reduce((m, s) => Math.max(m, Math.abs(s)), 0);
+                debugLog('Viz: calls=' + vizUpdateCount + ', maxSample=' + maxSample.toFixed(6) + ', maxLevel=' + maxLevel.toFixed(6) + ', samples=' + samples.length);
+            }
         }
         
+        function vizHeight(level) {
+            // Decibel scale: maps real-world audio levels to visible bar heights
+            // Level 0.001 (-60dB) -> 6px, Level 0.01 (-40dB) -> ~40px, Level 0.1 (-20dB) -> ~73px, Level 1.0 (0dB) -> 110px
+            if (level < 0.0001) return 6;
+            const db = 20 * Math.log10(level);
+            return Math.max(6, Math.min(110, ((db + 60) / 60) * 110));
+        }
+
         function animateVisualizer() {
             for (let i = 0; i < NUM_BARS; i++) {
                 if (vizBars[i]) {
-                    // Scale to pixel height (6-110px range for compact layout)
-                    const height = Math.max(6, Math.min(110, vizLevels[i] * 400));
-                    vizBars[i].style.height = height + 'px';
+                    vizBars[i].style.height = vizHeight(vizLevels[i]) + 'px';
                 }
             }
             if (isPlaying) {
                 vizAnimFrame = requestAnimationFrame(animateVisualizer);
             }
         }
-        
+
+        // Fallback timer for iOS Safari where rAF is throttled
+        let vizInterval = null;
+        function startVizInterval() {
+            if (vizInterval) return;
+            vizInterval = setInterval(() => {
+                if (!isPlaying) { clearInterval(vizInterval); vizInterval = null; return; }
+                for (let i = 0; i < NUM_BARS; i++) {
+                    if (vizBars[i]) {
+                        vizBars[i].style.height = vizHeight(vizLevels[i]) + 'px';
+                    }
+                }
+            }, 50);
+        }
+
         function resetVisualizer() {
             vizLevels.fill(0);
             for (let i = 0; i < NUM_BARS; i++) {
@@ -471,6 +503,10 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
             if (vizAnimFrame) {
                 cancelAnimationFrame(vizAnimFrame);
                 vizAnimFrame = null;
+            }
+            if (vizInterval) {
+                clearInterval(vizInterval);
+                vizInterval = null;
             }
         }
         
@@ -616,6 +652,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
                 // Start visualizer
                 initVisualizer();
                 animateVisualizer();
+                startVizInterval();
                 
             } catch (err) {
                 showError('Audio error: ' + err.message);
