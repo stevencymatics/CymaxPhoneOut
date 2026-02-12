@@ -69,7 +69,7 @@ class AppState: ObservableObject {
     private var stalePacketCheckCount: Int = 0
     
     init() {
-        log("Mix Link started")
+        log("Cymatics Link started")
         log("Ready to stream system audio to your phone")
         updateQRCode()
         setupSleepWakeObservers()
