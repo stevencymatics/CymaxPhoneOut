@@ -389,12 +389,10 @@ struct MenuBarView: View {
                         .frame(height: 30)
                         .background(Color.white.opacity(0.1))
                     
-                    // Packets
+                    // Connection quality
                     VStack(spacing: 2) {
-                        Text(formatPackets(appState.packetsSent))
-                            .font(.system(size: 18, weight: .semibold, design: .rounded))
-                            .foregroundColor(appState.packetsSent > 0 ? .white : .gray)
-                        Text("Packets")
+                        signalBars
+                        Text("Quality")
                             .font(.system(size: 9))
                             .foregroundColor(.gray)
                     }
@@ -408,13 +406,38 @@ struct MenuBarView: View {
         }
     }
     
-    private func formatPackets(_ count: Int) -> String {
-        if count >= 1000000 {
-            return String(format: "%.1fM", Double(count) / 1000000)
-        } else if count >= 1000 {
-            return String(format: "%.1fK", Double(count) / 1000)
+    /// 3-bar signal quality indicator
+    private var signalBars: some View {
+        let level = connectionQualityLevel
+        let colors: [Color] = [
+            Color(red: 0.29, green: 0.87, blue: 0.50), // green #4ade80
+            Color(red: 0.98, green: 0.75, blue: 0.14), // yellow #fbbf24
+            Color(red: 0.94, green: 0.27, blue: 0.27)  // red #ef4444
+        ]
+        let color = level >= 3 ? colors[0] : level == 2 ? colors[1] : colors[2]
+
+        return HStack(alignment: .bottom, spacing: 2) {
+            RoundedRectangle(cornerRadius: 1)
+                .fill(level >= 1 ? color : Color.gray.opacity(0.3))
+                .frame(width: 5, height: 6)
+            RoundedRectangle(cornerRadius: 1)
+                .fill(level >= 2 ? color : Color.gray.opacity(0.3))
+                .frame(width: 5, height: 12)
+            RoundedRectangle(cornerRadius: 1)
+                .fill(level >= 3 ? color : Color.gray.opacity(0.3))
+                .frame(width: 5, height: 18)
         }
-        return "\(count)"
+    }
+
+    /// 3 = good, 2 = fair, 1 = poor
+    private var connectionQualityLevel: Int {
+        guard appState.isServerRunning else { return 0 }
+        if appState.isCaptureActive && appState.webClientsConnected > 0 && appState.packetsSent > 0 {
+            return 3 // streaming to clients
+        } else if appState.isCaptureActive {
+            return 2 // capturing but no clients yet
+        }
+        return 1 // server running but issues
     }
     
     // MARK: - Controls

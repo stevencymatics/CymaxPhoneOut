@@ -184,7 +184,34 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
             margin-top: 10px;
             font-size: 1.1rem;
             color: #666;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 6px;
         }
+
+        .signal-bars {
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+            height: 18px;
+        }
+
+        .signal-bars .bar {
+            width: 5px;
+            border-radius: 1px;
+            background: #333;
+            transition: background 0.3s;
+        }
+
+        .signal-bars .bar:nth-child(1) { height: 5px; }
+        .signal-bars .bar:nth-child(2) { height: 10px; }
+        .signal-bars .bar:nth-child(3) { height: 16px; }
+
+        .signal-bars.good .bar { background: #4ade80; }
+        .signal-bars.fair .bar:nth-child(1),
+        .signal-bars.fair .bar:nth-child(2) { background: #fbbf24; }
+        .signal-bars.poor .bar:nth-child(1) { background: #ef4444; }
         
         .error-message {
             color: #ef4444;
@@ -321,7 +348,12 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
         
         
         <div class="stats" id="statsDisplay">
-            Packets: <span id="packets">0</span> | Buffer: <span id="buffer">0ms</span>
+            <div class="signal-bars" id="signalBars">
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+            </div>
+            <span id="buffer">0ms</span>
         </div>
         
         <div class="error-message" id="errorMsg"></div>
@@ -636,9 +668,6 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
             readPos = 0;
             isPrebuffering = true;
             isInitialStart = true;  // Reset so next play is fast
-            processCallCount = 0;
-            processStartTime = 0;
-            totalFramesConsumed = 0;
             
             // Update lock screen state
             updateMediaSessionState(false);
@@ -662,7 +691,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
                 return true;
             }
             
-            const httpUrl = 'http://' + WS_HOST + ':19621/health';
+            const httpUrl = 'http://' + WS_HOST + ':' + WS_PORT + '/health';
             debugLog('🌐 Network warmup: fetching ' + httpUrl);
             const warmupStart = Date.now();
             
@@ -932,12 +961,6 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
             const channels = view.getUint16(12, true);
             const frameCount = view.getUint16(14, true);
             
-            // #region agent log - H1 sample rate from packet
-            if (packetsReceived === 1 || packetsReceived === 10) {
-                fetch('http://127.0.0.1:7246/ingest/d4ebf198-e5bf-4fa0-ac15-a853e9105e0d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'WebPlayer:handleAudioPacket',message:'PACKET_RATE',data:{packetSampleRate:packetSampleRate,sourceRate:sourceRate,outputRate:outputRate,resampleRatio:resampleRatio,sourceRateSet:sourceRateSet,packetsReceived:packetsReceived},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
-            }
-            // #endregion
-            
             // CRITICAL: Use the actual sample rate from the packet header!
             if (!sourceRateSet && packetSampleRate > 0) {
                 sourceRate = packetSampleRate;
@@ -945,10 +968,6 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
                 resampleRatio = outputRate / sourceRate;
                 debugLog('Source rate set from packet: ' + sourceRate + 'Hz, Ratio: ' + resampleRatio.toFixed(4));
                 document.getElementById('sampleRate').textContent = outputRate + 'Hz (src:' + sourceRate + ')';
-                
-                // #region agent log - H1 resample ratio calculation
-                fetch('http://127.0.0.1:7246/ingest/d4ebf198-e5bf-4fa0-ac15-a853e9105e0d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'WebPlayer:handleAudioPacket',message:'RESAMPLE_CALC',data:{sourceRate:sourceRate,outputRate:outputRate,resampleRatio:resampleRatio},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
-                // #endregion
             }
             
             if (packetsReceived === 1) {
@@ -963,11 +982,6 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
                 debugLog('Audio samples: ' + audioData.length + ' (' + inputFrames + ' frames)');
                 debugLog('First samples: ' + audioData.slice(0, 8).map(x => x.toFixed(4)).join(', '));
             }
-            
-            // #region agent log - H4 buffer state before write
-            const writePosBefore = writePos;
-            const bufferedBefore = bufferedSamples;
-            // #endregion
             
             // Resample if needed (linear interpolation)
             if (Math.abs(resampleRatio - 1.0) > 0.001) {
@@ -1007,21 +1021,31 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
                 }
                 bufferedSamples = Math.min(bufferedSamples + audioData.length, BUFFER_SIZE);
             }
-            
-            // #region agent log - H4 detect buffer overflow
-            if (packetsReceived % 500 === 0) {
-                fetch('http://127.0.0.1:7246/ingest/d4ebf198-e5bf-4fa0-ac15-a853e9105e0d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'WebPlayer:handleAudioPacket',message:'BUFFER_STATE',data:{writePosBefore:writePosBefore,writePos:writePos,readPos:readPos,bufferedBefore:bufferedBefore,bufferedSamples:bufferedSamples,BUFFER_SIZE:BUFFER_SIZE,wrapDetected:(writePos < writePosBefore)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
-            }
-            // #endregion
-            
+
             // Update stats every 50 packets
             if (packetsReceived % 50 === 0) {
                 const bufferMs = Math.round((bufferedSamples / 2) / outputRate * 1000);
-                document.getElementById('packets').textContent = packetsReceived;
                 document.getElementById('buffer').textContent = bufferMs + 'ms';
 
+                // Prune underrun timestamps older than 10s
+                const now = Date.now();
+                while (underrunTimestamps.length > 0 && now - underrunTimestamps[0] > 10000) {
+                    underrunTimestamps.shift();
+                }
+                const recentUnderruns = underrunTimestamps.length;
+
+                // Update signal quality indicator
+                const bars = document.getElementById('signalBars');
+                if (bufferMs > 40 && recentUnderruns === 0) {
+                    bars.className = 'signal-bars good';
+                } else if (bufferMs < 15 || recentUnderruns >= 3) {
+                    bars.className = 'signal-bars poor';
+                } else {
+                    bars.className = 'signal-bars fair';
+                }
+
                 if (packetsReceived % 200 === 0) {
-                    debugLog('Stats: packets=' + packetsReceived + ', buffer=' + bufferMs + 'ms');
+                    debugLog('Stats: packets=' + packetsReceived + ', buffer=' + bufferMs + 'ms, underruns(10s)=' + recentUnderruns);
                 }
             }
 
@@ -1035,21 +1059,12 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
         }
         
         let underrunCount = 0;
-        let processCallCount = 0;
-        let processStartTime = 0;
-        let totalFramesConsumed = 0;
+        let underrunTimestamps = [];
         
         function processAudio(e) {
             const outputL = e.outputBuffer.getChannelData(0);
             const outputR = e.outputBuffer.getChannelData(1);
             const frameCount = outputL.length;
-            
-            // #region agent log - H8/H9 track playback rate
-            processCallCount++;
-            if (processStartTime === 0) {
-                processStartTime = performance.now();
-            }
-            // #endregion
             
             // Check if we have enough buffered data
             const samplesNeeded = frameCount * 2; // stereo
@@ -1082,6 +1097,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
             if (bufferedSamples < samplesNeeded) {
                 // Underrun - output silence and start rebuffering
                 underrunCount++;
+                underrunTimestamps.push(Date.now());
                 isPrebuffering = true;  // Go back to prebuffering (will use rebufferSamples)
                 debugLog('Buffer underrun #' + underrunCount + ', need ' + samplesNeeded + ', have ' + bufferedSamples + ' - rebuffering...', 'warn');
                 for (let i = 0; i < frameCount; i++) {
@@ -1101,21 +1117,9 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
             }
             
             bufferedSamples -= samplesNeeded;
-            totalFramesConsumed += frameCount;
-            
+
             // Update visualizer with current audio
             updateVisualizer(outputL);
-            
-            // #region agent log - H8/H9 measure actual playback rate
-            if (processCallCount % 100 === 0) {
-                const elapsed = (performance.now() - processStartTime) / 1000;
-                const effectiveRate = totalFramesConsumed / elapsed;
-                const drift = totalFramesConsumed - Math.floor(elapsed * outputRate);
-                const driftPct = (drift / (elapsed * outputRate)) * 100;
-                debugLog('PLAYBACK_RATE: elapsed=' + elapsed.toFixed(2) + 's, frames=' + totalFramesConsumed + ', rate=' + effectiveRate.toFixed(0) + 'Hz, drift=' + driftPct.toFixed(2) + '%');
-                fetch('http://127.0.0.1:7246/ingest/d4ebf198-e5bf-4fa0-ac15-a853e9105e0d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'WebPlayer:processAudio',message:'PLAYBACK_RATE',data:{elapsed:elapsed,totalFramesConsumed:totalFramesConsumed,effectiveRate:effectiveRate,outputRate:outputRate,drift:drift,driftPct:driftPct,processCallCount:processCallCount},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H8'})}).catch(()=>{});
-            }
-            // #endregion
         }
         
         function setVolume(value) {

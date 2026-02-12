@@ -52,48 +52,55 @@ class QRCodeGenerator {
         return nsImage
     }
     
-    /// Get the local IP address of the Mac
-    static func getLocalIPAddress() -> String? {
-        var address: String?
-        
-        // Get list of all interfaces
+    /// Get the local IP address of the Mac.
+    /// If preferredInterface is provided, resolves that interface's IPv4 address first.
+    /// Falls back to scanning en0/en1/en* interfaces.
+    static func getLocalIPAddress(preferredInterface: String? = nil) -> String? {
         var ifaddr: UnsafeMutablePointer<ifaddrs>?
         guard getifaddrs(&ifaddr) == 0 else { return nil }
         defer { freeifaddrs(ifaddr) }
-        
+
+        var fallback: String?
+
         var ptr = ifaddr
         while ptr != nil {
             defer { ptr = ptr?.pointee.ifa_next }
-            
+
             guard let interface = ptr?.pointee else { continue }
-            
-            // Check for IPv4
+
+            // Only IPv4
             let addrFamily = interface.ifa_addr.pointee.sa_family
-            if addrFamily == UInt8(AF_INET) {
-                // Get interface name
-                let name = String(cString: interface.ifa_name)
-                
-                // Prefer en0 (WiFi) or en1, skip lo0 (localhost)
-                if name == "en0" || name == "en1" || name.hasPrefix("en") {
-                    // Convert address to string
-                    var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-                    if getnameinfo(interface.ifa_addr, socklen_t(interface.ifa_addr.pointee.sa_len),
-                                   &hostname, socklen_t(hostname.count),
-                                   nil, 0, NI_NUMERICHOST) == 0 {
-                        let ip = String(cString: hostname)
-                        // Prefer WiFi (en0)
-                        if name == "en0" {
-                            return ip
-                        }
-                        if address == nil {
-                            address = ip
-                        }
-                    }
-                }
+            guard addrFamily == UInt8(AF_INET) else { continue }
+
+            let name = String(cString: interface.ifa_name)
+
+            // Skip loopback
+            guard name != "lo0" else { continue }
+
+            var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+            guard getnameinfo(interface.ifa_addr, socklen_t(interface.ifa_addr.pointee.sa_len),
+                              &hostname, socklen_t(hostname.count),
+                              nil, 0, NI_NUMERICHOST) == 0 else { continue }
+
+            let ip = String(cString: hostname)
+
+            // Skip link-local (169.254.x.x)
+            if ip.hasPrefix("169.254.") { continue }
+
+            // Exact match on preferred interface (from NWPathMonitor)
+            if let preferred = preferredInterface, name == preferred {
+                return ip
+            }
+
+            // Fallback priority: en0 first, then any en* interface
+            if name == "en0" && fallback == nil {
+                fallback = ip
+            } else if fallback == nil && (name.hasPrefix("en") || name.hasPrefix("bridge")) {
+                fallback = ip
             }
         }
-        
-        return address
+
+        return fallback
     }
     
     /// Generate the full URL for the web player

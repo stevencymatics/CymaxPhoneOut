@@ -12,9 +12,10 @@ import CommonCrypto
 /// Combined HTTP and WebSocket server for serving the web player and streaming audio
 class HTTPServer {
     private var listener: NWListener?
-    private let port: UInt16
+    private let requestedPort: UInt16
+    private(set) var actualPort: UInt16 = 0
     private let queue = DispatchQueue(label: "com.cymax.http")
-    
+
     private var isRunning = false
     
     // WebSocket connections
@@ -25,7 +26,7 @@ class HTTPServer {
     var htmlContent: String = ""
     
     /// WebSocket port for the player to connect to (same as HTTP now)
-    var webSocketPort: UInt16 { port }
+    var webSocketPort: UInt16 { actualPort }
     
     /// Callback when client count changes
     var onClientCountChanged: ((Int) -> Void)?
@@ -43,47 +44,92 @@ class HTTPServer {
     }
     
     init(port: UInt16 = 19621) {
-        self.port = port
+        self.requestedPort = port
     }
     
     deinit {
         stop()
     }
     
-    /// Start the HTTP server
+    /// Start the HTTP server, trying ports from requestedPort to requestedPort+9
     func start() {
         guard !isRunning else { return }
-        
+
+        for portOffset in 0..<10 {
+            let tryPort = requestedPort + UInt16(portOffset)
+            if tryBind(port: tryPort) {
+                return
+            }
+        }
+        log("Error starting - all ports \(requestedPort)-\(requestedPort + 9) in use")
+    }
+
+    /// Attempt to bind to a specific port. Returns true on success.
+    private func tryBind(port: UInt16) -> Bool {
+        let params = NWParameters.tcp
+        params.allowLocalEndpointReuse = true
+
+        let newListener: NWListener
         do {
-            let params = NWParameters.tcp
-            params.allowLocalEndpointReuse = true
-            
-            listener = try NWListener(using: params, on: NWEndpoint.Port(integerLiteral: port))
-            
-            listener?.stateUpdateHandler = { [weak self] state in
+            newListener = try NWListener(using: params, on: NWEndpoint.Port(integerLiteral: port))
+        } catch {
+            log("Cannot create listener on port \(port): \(error)")
+            return false
+        }
+
+        let semaphore = DispatchSemaphore(value: 0)
+        var bindSucceeded = false
+
+        newListener.stateUpdateHandler = { [weak self] state in
+            switch state {
+            case .ready:
+                bindSucceeded = true
+                semaphore.signal()
+            case .failed:
+                bindSucceeded = false
+                semaphore.signal()
+            case .cancelled:
+                self?.isRunning = false
+            default:
+                break
+            }
+        }
+
+        newListener.newConnectionHandler = { [weak self] connection in
+            self?.handleConnection(connection)
+        }
+
+        newListener.start(queue: queue)
+
+        // Wait up to 2 seconds for bind result
+        _ = semaphore.wait(timeout: .now() + 2.0)
+
+        if bindSucceeded {
+            listener = newListener
+            actualPort = port
+            isRunning = true
+
+            // Set the permanent state handler now that we're bound
+            newListener.stateUpdateHandler = { [weak self] state in
                 switch state {
                 case .ready:
-                    self?.log("✅ Listening on port \(self?.port ?? 0) (HTTP + WebSocket)")
+                    self?.log("Listening on port \(port) (HTTP + WebSocket)")
                 case .failed(let error):
-                    self?.log("❌ Failed - \(error)")
+                    self?.log("Failed - \(error)")
                     self?.isRunning = false
                 case .cancelled:
-                    self?.log("🛑 Cancelled")
                     self?.isRunning = false
                 default:
                     break
                 }
             }
-            
-            listener?.newConnectionHandler = { [weak self] connection in
-                self?.handleConnection(connection)
-            }
-            
-            listener?.start(queue: queue)
-            isRunning = true
-            
-        } catch {
-            log("Error starting - \(error)")
+
+            log("Listening on port \(port) (HTTP + WebSocket)")
+            return true
+        } else {
+            newListener.cancel()
+            log("Port \(port) unavailable, trying next...")
+            return false
         }
     }
     
