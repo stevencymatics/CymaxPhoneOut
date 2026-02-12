@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # create_dmg.sh
-# Creates a styled DMG installer with vertical drag-to-Applications UI (like Chrome)
+# Creates a styled DMG installer with vertical drag-to-Applications UI
 #
 # Usage: ./create_dmg.sh [path-to-app]
 #
@@ -18,7 +18,7 @@ DMG_NAME="MixLink"
 DMG_OUTPUT="$PROJECT_ROOT/${DMG_NAME}.dmg"
 VOLUME_NAME="$APP_NAME"
 
-# Installer styling - VERTICAL LAYOUT (like Chrome)
+# Installer styling - VERTICAL LAYOUT
 WINDOW_WIDTH=540
 WINDOW_HEIGHT=540
 ICON_SIZE=100
@@ -31,10 +31,10 @@ APP_Y=90
 APPS_X=270
 APPS_Y=340
 
-# Hidden files position (far below visible area - only shown when window stretched)
+# Hidden files position (far below visible area)
 HIDDEN_Y=750
 
-# Background image size (large enough for any resize)
+# Background image size
 BG_WIDTH=1200
 BG_HEIGHT=900
 
@@ -56,7 +56,6 @@ echo ""
 # Check if app exists
 if [ ! -d "$APP_PATH" ]; then
     error "App not found at: $APP_PATH"
-    echo "Run build_all.sh first, or specify path: ./create_dmg.sh /path/to/App.app"
 fi
 
 # Create temp directory for DMG contents
@@ -70,16 +69,15 @@ echo "Creating DMG contents..."
 cp -R "$APP_PATH" "$DMG_TEMP/$APP_NAME.app"
 success "Copied app"
 
-# Create Applications symlink
-ln -s /Applications "$DMG_TEMP/Applications"
-success "Created Applications symlink"
+# DO NOT create symlink here — we create a Finder alias after mounting
+# (symlinks don't show the folder icon reliably on ARM Macs)
 
-# Generate background image with DOWNWARD arrow and highlight box
+# Generate background image
 BACKGROUND_DIR="$DMG_TEMP/.background"
 mkdir -p "$BACKGROUND_DIR"
 BACKGROUND_PATH="$BACKGROUND_DIR/installer_background.png"
 
-echo "Generating installer background (vertical layout)..."
+echo "Generating installer background..."
 /usr/bin/python3 "$SCRIPT_DIR/generate_background.py" "$BACKGROUND_PATH" $BG_WIDTH $BG_HEIGHT $APP_X $APP_Y $APPS_X $APPS_Y $WINDOW_WIDTH $WINDOW_HEIGHT
 success "Generated background image"
 
@@ -90,11 +88,9 @@ VOLUME_ICON="$DMG_TEMP/.VolumeIcon.icns"
 HAS_VOLUME_ICON=false
 
 if [ -f "$APP_ICON_DIR/icon_1024x1024.png" ]; then
-    # Create iconset directory
     ICONSET_DIR="$TEMP_DIR/VolumeIcon.iconset"
     mkdir -p "$ICONSET_DIR"
 
-    # Generate all required sizes
     sips -z 16 16 "$APP_ICON_DIR/icon_1024x1024.png" --out "$ICONSET_DIR/icon_16x16.png" 2>/dev/null
     sips -z 32 32 "$APP_ICON_DIR/icon_1024x1024.png" --out "$ICONSET_DIR/icon_16x16@2x.png" 2>/dev/null
     sips -z 32 32 "$APP_ICON_DIR/icon_1024x1024.png" --out "$ICONSET_DIR/icon_32x32.png" 2>/dev/null
@@ -106,7 +102,6 @@ if [ -f "$APP_ICON_DIR/icon_1024x1024.png" ]; then
     sips -z 512 512 "$APP_ICON_DIR/icon_1024x1024.png" --out "$ICONSET_DIR/icon_512x512.png" 2>/dev/null
     cp "$APP_ICON_DIR/icon_1024x1024.png" "$ICONSET_DIR/icon_512x512@2x.png"
 
-    # Convert to icns
     if iconutil -c icns "$ICONSET_DIR" -o "$VOLUME_ICON" 2>/dev/null; then
         HAS_VOLUME_ICON=true
         success "Created volume icon"
@@ -123,10 +118,10 @@ rm -f "${DMG_OUTPUT%.dmg}_temp.dmg"
 
 echo "Creating DMG..."
 
-# Create temporary DMG (read-write) with extra space
+# Create temporary DMG (read-write)
 TEMP_DMG="${DMG_OUTPUT%.dmg}_temp.dmg"
 hdiutil create -srcfolder "$DMG_TEMP" -volname "$VOLUME_NAME" -fs HFS+ \
-    -fsargs "-c c=64,a=16,e=16" -format UDRW -size 10m "$TEMP_DMG"
+    -fsargs "-c c=64,a=16,e=16" -format UDRW -size 15m "$TEMP_DMG"
 success "Created temporary DMG"
 
 # Mount the temp DMG
@@ -140,13 +135,26 @@ if [ -d "$MOUNT_DIR" ]; then
 fi
 
 hdiutil attach "$TEMP_DMG" -mountpoint "$MOUNT_DIR" -nobrowse
+success "Mounted DMG"
 
 # Set volume to use custom icon
 if [ -f "$MOUNT_DIR/.VolumeIcon.icns" ]; then
     SetFile -a C "$MOUNT_DIR" 2>/dev/null || true
 fi
 
-# Build the hidden-items positioning block conditionally
+# Create Applications alias using Finder (not symlink!)
+# Finder aliases carry icon metadata and work reliably on ARM Macs
+echo "Creating Applications alias..."
+osascript <<EOF
+tell application "Finder"
+    set targetFolder to (POSIX file "/Applications") as alias
+    set dmgVolume to (POSIX file "$MOUNT_DIR") as alias
+    make new alias file at dmgVolume to targetFolder with properties {name:"Applications"}
+end tell
+EOF
+success "Created Applications alias (Finder alias, not symlink)"
+
+# Build the hidden-items positioning block
 POSITION_HIDDEN_ITEMS=""
 if [ "$HAS_VOLUME_ICON" = true ]; then
     POSITION_HIDDEN_ITEMS="
@@ -155,8 +163,7 @@ if [ "$HAS_VOLUME_ICON" = true ]; then
         end try"
 fi
 
-# Apply visual styling using AppleScript
-# Run twice to ensure .DS_Store is reliably written
+# Apply visual styling using AppleScript (run twice for .DS_Store reliability)
 echo "Applying visual styling..."
 osascript <<EOF
 tell application "Finder"
@@ -173,16 +180,13 @@ tell application "Finder"
         set arrangement of theViewOptions to not arranged
         set icon size of theViewOptions to $ICON_SIZE
 
-        -- Set background picture using disk-relative path
         try
             set background picture of theViewOptions to file ".background:installer_background.png"
         end try
 
-        -- Position visible icons (app and Applications)
         set position of item "$APP_NAME.app" of container window to {$APP_X, $APP_Y}
         set position of item "Applications" of container window to {$APPS_X, $APPS_Y}
 
-        -- Position hidden files far below visible area
         try
             set position of item ".background" of container window to {100, $HIDDEN_Y}
         end try
@@ -191,7 +195,7 @@ tell application "Finder"
         close
         open
 
-        -- Re-apply positions after reopen to ensure .DS_Store persistence
+        -- Re-apply to ensure .DS_Store persistence
         set current view of container window to icon view
         set toolbar visible of container window to false
         set statusbar visible of container window to false
@@ -222,7 +226,7 @@ end tell
 EOF
 success "Applied visual styling"
 
-# Extra wait for Finder to flush .DS_Store to disk
+# Wait for Finder to flush .DS_Store
 sleep 3
 
 # Sync and unmount
@@ -236,7 +240,7 @@ echo "Compressing final DMG..."
 hdiutil convert "$TEMP_DMG" -format UDZO -imagekey zlib-level=9 -o "$DMG_OUTPUT"
 success "Created compressed DMG"
 
-# Set custom icon on the DMG file itself using JXA (JavaScript for Automation)
+# Set custom icon on the DMG file itself
 echo "Setting DMG file icon..."
 if [ -f "$APP_ICON_DIR/icon_1024x1024.png" ]; then
     osascript -l JavaScript << JXASCRIPT
@@ -267,7 +271,7 @@ fi
 rm -f "$TEMP_DMG"
 rm -rf "$TEMP_DIR"
 
-# Final DMG info
+# Final info
 DMG_SIZE=$(ls -lh "$DMG_OUTPUT" | awk '{print $5}')
 
 echo ""
@@ -280,8 +284,8 @@ echo "  Size:   $DMG_SIZE"
 echo ""
 echo "  The installer includes:"
 echo "    - $APP_NAME.app (top)"
-echo "    - Applications folder (bottom)"
-echo "    - Downward arrow"
+echo "    - Applications folder alias (bottom)"
+echo "    - Downward arrow background"
 if [ "$HAS_VOLUME_ICON" = true ]; then
 echo "    - Custom volume icon"
 fi
