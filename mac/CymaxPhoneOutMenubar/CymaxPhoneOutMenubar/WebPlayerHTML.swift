@@ -182,63 +182,38 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
         
         .stats {
             margin-top: 10px;
-            font-size: 1.1rem;
-            color: #666;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
         }
-        
+
+        .signal-bars {
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+            height: 18px;
+        }
+
+        .signal-bars .bar {
+            width: 5px;
+            border-radius: 1px;
+            background: #333;
+            transition: background 0.3s;
+        }
+
+        .signal-bars .bar:nth-child(1) { height: 5px; }
+        .signal-bars .bar:nth-child(2) { height: 10px; }
+        .signal-bars .bar:nth-child(3) { height: 16px; }
+
+        .signal-bars.good .bar { background: #4ade80; }
+        .signal-bars.fair .bar:nth-child(1),
+        .signal-bars.fair .bar:nth-child(2) { background: #fbbf24; }
+        .signal-bars.poor .bar:nth-child(1) { background: #ef4444; }
+
         .error-message {
             color: #ef4444;
             margin-top: 20px;
             font-size: 0.85rem;
-        }
-        
-        .debug-section {
-            margin-top: 15px;
-            padding-top: 10px;
-            border-top: 1px solid #222;
-        }
-        
-        .debug-toggle {
-            background: none;
-            border: 1px solid #333;
-            color: #666;
-            padding: 8px 16px;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            cursor: pointer;
-        }
-        
-        .debug-log {
-            margin-top: 15px;
-            background: rgba(0,0,0,0.4);
-            border-radius: 8px;
-            padding: 12px;
-            text-align: left;
-            max-height: 150px;
-            overflow-y: auto;
-            font-family: monospace;
-            font-size: 0.65rem;
-            color: #666;
-        }
-        
-        .debug-log .log-entry {
-            margin: 2px 0;
-            word-break: break-all;
-        }
-        
-        .debug-log .log-info { color: #4ade80; }
-        .debug-log .log-warn { color: #fbbf24; }
-        .debug-log .log-error { color: #ef4444; }
-        
-        .copy-btn {
-            margin-top: 10px;
-            padding: 6px 12px;
-            background: transparent;
-            border: 1px solid #333;
-            border-radius: 4px;
-            color: #666;
-            font-size: 0.7rem;
-            cursor: pointer;
         }
         
         /* Reconnecting overlay */
@@ -321,7 +296,11 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
         
         
         <div class="stats" id="statsDisplay">
-            Packets: <span id="packets">0</span> | Buffer: <span id="buffer">0ms</span>
+            <div class="signal-bars" id="signalBars">
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+            </div>
         </div>
         
         <div class="error-message" id="errorMsg"></div>
@@ -333,11 +312,6 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
             <span id="sampleRate">-</span>
         </div>
         
-        <div class="debug-section">
-            <button class="debug-toggle" onclick="toggleDebug()">Show Debug Log</button>
-            <div class="debug-log hidden" id="debugLog"></div>
-            <button class="copy-btn hidden" id="copyBtn" onclick="copyLog()">Copy Log</button>
-        </div>
     </div>
     
     <!-- Audio element for output - routes through HTML5 audio to bypass iOS silent mode -->
@@ -442,32 +416,8 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
             }
         }
         
-        function toggleDebug() {
-            const log = document.getElementById('debugLog');
-            const copyBtn = document.getElementById('copyBtn');
-            log.classList.toggle('hidden');
-            copyBtn.classList.toggle('hidden');
-        }
-        
-        // Debug logging
-        const maxLogEntries = 50;
         function debugLog(msg, level = 'info') {
-            const logDiv = document.getElementById('debugLog');
-            const time = new Date().toLocaleTimeString('en-US', {hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3});
-            const entry = document.createElement('div');
-            entry.className = 'log-entry log-' + level;
-            entry.textContent = '[' + time + '] ' + msg;
-            logDiv.appendChild(entry);
-            
-            // Keep only last N entries
-            while (logDiv.children.length > maxLogEntries) {
-                logDiv.removeChild(logDiv.firstChild);
-            }
-            
-            // Scroll to bottom
-            logDiv.scrollTop = logDiv.scrollHeight;
-            
-            console.log('[Cymax] ' + msg);
+            if (level !== 'info') console.log('[Cymax] ' + msg);
         }
         
         function updateStatus(status, text) {
@@ -636,10 +586,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
             readPos = 0;
             isPrebuffering = true;
             isInitialStart = true;  // Reset so next play is fast
-            processCallCount = 0;
-            processStartTime = 0;
-            totalFramesConsumed = 0;
-            
+
             // Update lock screen state
             updateMediaSessionState(false);
             
@@ -932,12 +879,6 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
             const channels = view.getUint16(12, true);
             const frameCount = view.getUint16(14, true);
             
-            // #region agent log - H1 sample rate from packet
-            if (packetsReceived === 1 || packetsReceived === 10) {
-                fetch('http://127.0.0.1:7246/ingest/d4ebf198-e5bf-4fa0-ac15-a853e9105e0d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'WebPlayer:handleAudioPacket',message:'PACKET_RATE',data:{packetSampleRate:packetSampleRate,sourceRate:sourceRate,outputRate:outputRate,resampleRatio:resampleRatio,sourceRateSet:sourceRateSet,packetsReceived:packetsReceived},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
-            }
-            // #endregion
-            
             // CRITICAL: Use the actual sample rate from the packet header!
             if (!sourceRateSet && packetSampleRate > 0) {
                 sourceRate = packetSampleRate;
@@ -946,9 +887,6 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
                 debugLog('Source rate set from packet: ' + sourceRate + 'Hz, Ratio: ' + resampleRatio.toFixed(4));
                 document.getElementById('sampleRate').textContent = outputRate + 'Hz (src:' + sourceRate + ')';
                 
-                // #region agent log - H1 resample ratio calculation
-                fetch('http://127.0.0.1:7246/ingest/d4ebf198-e5bf-4fa0-ac15-a853e9105e0d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'WebPlayer:handleAudioPacket',message:'RESAMPLE_CALC',data:{sourceRate:sourceRate,outputRate:outputRate,resampleRatio:resampleRatio},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
-                // #endregion
             }
             
             if (packetsReceived === 1) {
@@ -963,11 +901,6 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
                 debugLog('Audio samples: ' + audioData.length + ' (' + inputFrames + ' frames)');
                 debugLog('First samples: ' + audioData.slice(0, 8).map(x => x.toFixed(4)).join(', '));
             }
-            
-            // #region agent log - H4 buffer state before write
-            const writePosBefore = writePos;
-            const bufferedBefore = bufferedSamples;
-            // #endregion
             
             // Resample if needed (linear interpolation)
             if (Math.abs(resampleRatio - 1.0) > 0.001) {
@@ -1008,20 +941,16 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
                 bufferedSamples = Math.min(bufferedSamples + audioData.length, BUFFER_SIZE);
             }
             
-            // #region agent log - H4 detect buffer overflow
-            if (packetsReceived % 500 === 0) {
-                fetch('http://127.0.0.1:7246/ingest/d4ebf198-e5bf-4fa0-ac15-a853e9105e0d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'WebPlayer:handleAudioPacket',message:'BUFFER_STATE',data:{writePosBefore:writePosBefore,writePos:writePos,readPos:readPos,bufferedBefore:bufferedBefore,bufferedSamples:bufferedSamples,BUFFER_SIZE:BUFFER_SIZE,wrapDetected:(writePos < writePosBefore)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
-            }
-            // #endregion
-            
-            // Update stats every 50 packets
+            // Update signal quality every 50 packets
             if (packetsReceived % 50 === 0) {
                 const bufferMs = Math.round((bufferedSamples / 2) / outputRate * 1000);
-                document.getElementById('packets').textContent = packetsReceived;
-                document.getElementById('buffer').textContent = bufferMs + 'ms';
-
-                if (packetsReceived % 200 === 0) {
-                    debugLog('Stats: packets=' + packetsReceived + ', buffer=' + bufferMs + 'ms');
+                const bars = document.getElementById('signalBars');
+                if (bufferMs > 60) {
+                    bars.className = 'signal-bars good';
+                } else if (bufferMs < 20) {
+                    bars.className = 'signal-bars poor';
+                } else {
+                    bars.className = 'signal-bars fair';
                 }
             }
 
@@ -1035,21 +964,11 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
         }
         
         let underrunCount = 0;
-        let processCallCount = 0;
-        let processStartTime = 0;
-        let totalFramesConsumed = 0;
         
         function processAudio(e) {
             const outputL = e.outputBuffer.getChannelData(0);
             const outputR = e.outputBuffer.getChannelData(1);
             const frameCount = outputL.length;
-            
-            // #region agent log - H8/H9 track playback rate
-            processCallCount++;
-            if (processStartTime === 0) {
-                processStartTime = performance.now();
-            }
-            // #endregion
             
             // Check if we have enough buffered data
             const samplesNeeded = frameCount * 2; // stereo
@@ -1101,21 +1020,9 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
             }
             
             bufferedSamples -= samplesNeeded;
-            totalFramesConsumed += frameCount;
-            
+
             // Update visualizer with current audio
             updateVisualizer(outputL);
-            
-            // #region agent log - H8/H9 measure actual playback rate
-            if (processCallCount % 100 === 0) {
-                const elapsed = (performance.now() - processStartTime) / 1000;
-                const effectiveRate = totalFramesConsumed / elapsed;
-                const drift = totalFramesConsumed - Math.floor(elapsed * outputRate);
-                const driftPct = (drift / (elapsed * outputRate)) * 100;
-                debugLog('PLAYBACK_RATE: elapsed=' + elapsed.toFixed(2) + 's, frames=' + totalFramesConsumed + ', rate=' + effectiveRate.toFixed(0) + 'Hz, drift=' + driftPct.toFixed(2) + '%');
-                fetch('http://127.0.0.1:7246/ingest/d4ebf198-e5bf-4fa0-ac15-a853e9105e0d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'WebPlayer:processAudio',message:'PLAYBACK_RATE',data:{elapsed:elapsed,totalFramesConsumed:totalFramesConsumed,effectiveRate:effectiveRate,outputRate:outputRate,drift:drift,driftPct:driftPct,processCallCount:processCallCount},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H8'})}).catch(()=>{});
-            }
-            // #endregion
         }
         
         function setVolume(value) {
@@ -1125,56 +1032,8 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
             }
         }
         
-        function copyLog() {
-            const logDiv = document.getElementById('debugLog');
-            const entries = Array.from(logDiv.querySelectorAll('.log-entry')).map(e => e.textContent);
-            const text = entries.join('\\n');
-            
-            if (navigator.clipboard) {
-                navigator.clipboard.writeText(text).then(() => {
-                    debugLog('Log copied to clipboard!');
-                }).catch(err => {
-                    debugLog('Copy failed: ' + err, 'error');
-                    // Fallback
-                    fallbackCopy(text);
-                });
-            } else {
-                fallbackCopy(text);
-            }
-        }
-        
-        function fallbackCopy(text) {
-            const textarea = document.createElement('textarea');
-            textarea.value = text;
-            textarea.style.position = 'fixed';
-            textarea.style.opacity = '0';
-            document.body.appendChild(textarea);
-            textarea.select();
-            try {
-                document.execCommand('copy');
-                debugLog('Log copied! (fallback)');
-            } catch (e) {
-                debugLog('Copy failed', 'error');
-            }
-            document.body.removeChild(textarea);
-        }
-        
-        // Initial log
-        debugLog('Cymax Audio Web Player loaded');
-        debugLog('Will connect to ws://' + WS_HOST + ':' + WS_PORT);
-        
-        // Tab visibility - mute when hidden, unmute when visible
-        document.addEventListener('visibilitychange', () => {
-            if (!isPlaying || !gainNode) return;
-            
-            if (document.hidden) {
-                debugLog('Tab hidden - muting audio');
-                gainNode.gain.value = 0;
-            } else {
-                debugLog('Tab visible - unmuting audio');
-                gainNode.gain.value = 1;
-            }
-        });
+        // Tab visibility - keep audio playing in background (this is a streaming app).
+        // MediaSession API handles pause/play via lock screen controls instead.
         
         // Prevent screen sleep on mobile
         if ('wakeLock' in navigator) {

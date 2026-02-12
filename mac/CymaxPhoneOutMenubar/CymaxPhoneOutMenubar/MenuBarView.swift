@@ -374,12 +374,22 @@ struct MenuBarView: View {
                         .frame(height: 30)
                         .background(Color.white.opacity(0.1))
                     
-                    // Packets
+                    // Signal strength
                     VStack(spacing: 2) {
-                        Text(formatPackets(appState.packetsSent))
-                            .font(.system(size: 18, weight: .semibold, design: .rounded))
-                            .foregroundColor(appState.packetsSent > 0 ? .white : .gray)
-                        Text("Packets")
+                        HStack(alignment: .bottom, spacing: 2) {
+                            let active = appState.isCaptureActive && appState.webClientsConnected > 0
+                            let barColor: Color = active ? .mixLinkCyan : .gray.opacity(0.3)
+                            RoundedRectangle(cornerRadius: 1)
+                                .fill(appState.webClientsConnected > 0 ? barColor : .gray.opacity(0.3))
+                                .frame(width: 5, height: 6)
+                            RoundedRectangle(cornerRadius: 1)
+                                .fill(appState.isCaptureActive ? barColor : .gray.opacity(0.3))
+                                .frame(width: 5, height: 12)
+                            RoundedRectangle(cornerRadius: 1)
+                                .fill(active ? barColor : .gray.opacity(0.3))
+                                .frame(width: 5, height: 18)
+                        }
+                        Text("Signal")
                             .font(.system(size: 9))
                             .foregroundColor(.gray)
                     }
@@ -391,15 +401,6 @@ struct MenuBarView: View {
                 .cornerRadius(10)
             }
         }
-    }
-    
-    private func formatPackets(_ count: Int) -> String {
-        if count >= 1000000 {
-            return String(format: "%.1fM", Double(count) / 1000000)
-        } else if count >= 1000 {
-            return String(format: "%.1fK", Double(count) / 1000)
-        }
-        return "\(count)"
     }
     
     // MARK: - Controls

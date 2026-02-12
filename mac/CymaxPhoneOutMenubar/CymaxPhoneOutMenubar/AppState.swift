@@ -45,9 +45,6 @@ class AppState: ObservableObject {
     // Stats
     @Published var packetsSent: Int = 0
     
-    // Logging
-    @Published var logMessages: [LogMessage] = []
-    
     // Services
     private var audioCapture: SystemAudioCapture?
     private var httpServer: HTTPServer?  // Combined HTTP + WebSocket server
@@ -327,30 +324,6 @@ class AppState: ObservableObject {
     
     // MARK: - Audio Capture
     
-    // #region agent log - debug file logger
-    private func debugLog(_ hypothesisId: String, _ message: String, _ data: [String: Any] = [:]) {
-        let logPath = "/Users/stevencymatics/Documents/Phone Audio Project/.cursor/debug.log"
-        var logData: [String: Any] = [
-            "timestamp": Int(Date().timeIntervalSince1970 * 1000),
-            "location": "AppState.swift",
-            "sessionId": "debug-session",
-            "hypothesisId": hypothesisId,
-            "message": message,
-            "data": data
-        ]
-        if let jsonData = try? JSONSerialization.data(withJSONObject: logData),
-           let jsonString = String(data: jsonData, encoding: .utf8) {
-            if let handle = FileHandle(forWritingAtPath: logPath) {
-                handle.seekToEndOfFile()
-                handle.write((jsonString + "\n").data(using: .utf8)!)
-                handle.closeFile()
-            } else {
-                FileManager.default.createFile(atPath: logPath, contents: (jsonString + "\n").data(using: .utf8))
-            }
-        }
-    }
-    // #endregion
-    
     /// Open System Settings to Screen Recording permission pane
     func openScreenRecordingSettings() {
         SystemAudioCapture.openSystemSettings()
@@ -361,17 +334,7 @@ class AppState: ObservableObject {
         log("Starting system audio capture...")
         captureStatus = "Starting..."
         needsPermission = false  // Reset permission flag
-        
-        // #region agent log
-        // Check Info.plist for required keys
-        let screenCaptureDesc = Bundle.main.object(forInfoDictionaryKey: "NSScreenCaptureUsageDescription") as? String
-        let hasPermission = SystemAudioCapture.hasPermission()
-        debugLog("D", "Checking Info.plist keys and permission", [
-            "NSScreenCaptureUsageDescription": screenCaptureDesc ?? "NOT SET",
-            "hasPermission": hasPermission
-        ])
-        // #endregion
-        
+
         audioCapture = SystemAudioCapture()
         
         audioCapture?.onStatusUpdate = { [weak self] status in
@@ -396,30 +359,13 @@ class AppState: ObservableObject {
         
         Task {
             do {
-                // #region agent log
-                debugLog("E", "About to call audioCapture.start()", [:])
-                // #endregion
-                
                 try await audioCapture?.start()
                 await MainActor.run {
-                    // #region agent log
-                    self.debugLog("E", "audioCapture.start() SUCCEEDED", [:])
-                    // #endregion
                     self.isCaptureActive = true
                     self.captureStatus = "Capturing"
                 }
             } catch {
                 await MainActor.run {
-                    // #region agent log
-                    let nsError = error as NSError
-                    self.debugLog("A,B,C,D,E", "audioCapture.start() FAILED in AppState", [
-                        "errorDomain": nsError.domain,
-                        "errorCode": nsError.code,
-                        "errorDescription": error.localizedDescription,
-                        "errorFull": String(describing: error)
-                    ])
-                    // #endregion
-                    
                     // Check if it's a permission issue
                     if let captureError = error as? CaptureError, captureError == .notAuthorized {
                         self.needsPermission = true
@@ -476,47 +422,17 @@ class AppState: ObservableObject {
     // MARK: - Logging
     
     func log(_ message: String, level: LogLevel = .info) {
-        let logMessage = LogMessage(timestamp: Date(), level: level, message: message)
-        logMessages.append(logMessage)
-        
-        // Keep last 100 messages
-        if logMessages.count > 100 {
-            logMessages.removeFirst(logMessages.count - 100)
-        }
-        
         print("[\(level.rawValue)] \(message)")
     }
 }
 
-// MARK: - Log Message
+// MARK: - Log Level
 
 enum LogLevel: String {
     case debug = "DEBUG"
     case info = "INFO"
     case warning = "WARN"
     case error = "ERROR"
-    
-    var color: Color {
-        switch self {
-        case .debug: return .secondary
-        case .info: return .primary
-        case .warning: return .orange
-        case .error: return .red
-        }
-    }
-}
-
-struct LogMessage: Identifiable {
-    let id = UUID()
-    let timestamp: Date
-    let level: LogLevel
-    let message: String
-    
-    var formattedTimestamp: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss.SSS"
-        return formatter.string(from: timestamp)
-    }
 }
 
 // MARK: - Audio Processor (Thread-safe using OSAtomic-style counters)
@@ -524,8 +440,6 @@ struct LogMessage: Identifiable {
 /// Global audio processing state - avoids Swift concurrency issues
 private var gAudioSequence: UInt32 = 0
 private var gAudioPacketsSent: Int = 0
-private var gTotalFramesSent: Int = 0
-private var gStartTime: CFAbsoluteTime = 0
 private let gAudioQueue = DispatchQueue(label: "com.cymax.audioprocessing", qos: .userInteractive)
 
 /// Processes audio on a background queue - completely avoids Swift actor system
@@ -536,18 +450,11 @@ func processAudioGlobally(samples: [Float], sampleRate: Int, channels: Int, serv
     let ch = channels
     
     gAudioQueue.async {
-        // #region agent log - H5 track timing
-        if gStartTime == 0 {
-            gStartTime = CFAbsoluteTimeGetCurrent()
-        }
-        // #endregion
-        
         let framesPerPacket = 128
         let samplesPerPacket = framesPerPacket * ch
         
         var offset = 0
         var packetCount = 0
-        var framesThisBatch = 0
         
         while offset < samplesCopy.count {
             let end = min(offset + samplesPerPacket, samplesCopy.count)
@@ -592,50 +499,10 @@ func processAudioGlobally(samples: [Float], sampleRate: Int, channels: Int, serv
             server?.broadcast(audioPacket)
             
             gAudioPacketsSent += 1
-            gTotalFramesSent += frameCount
-            framesThisBatch += frameCount
             packetCount += 1
             
             offset = end
         }
-        
-        // #region agent log - H5 rate measurement
-        if gAudioPacketsSent % 500 == 0 {
-            let elapsed = CFAbsoluteTimeGetCurrent() - gStartTime
-            let expectedFrames = Int(elapsed * Double(sr))
-            let drift = gTotalFramesSent - expectedFrames
-            let effectiveRate = elapsed > 0 ? Double(gTotalFramesSent) / elapsed : 0
-            
-            let logPath = "/Users/stevencymatics/Documents/Phone Audio Project/.cursor/debug.log"
-            let logData: [String: Any] = [
-                "timestamp": Int(Date().timeIntervalSince1970 * 1000),
-                "location": "AppState.processAudioGlobally",
-                "sessionId": "debug-session",
-                "hypothesisId": "H5",
-                "message": "RATE_CHECK",
-                "data": [
-                    "elapsedSec": elapsed,
-                    "totalFramesSent": gTotalFramesSent,
-                    "expectedFrames": expectedFrames,
-                    "drift": drift,
-                    "driftPercent": expectedFrames > 0 ? Double(drift) / Double(expectedFrames) * 100 : 0,
-                    "effectiveRate": effectiveRate,
-                    "targetRate": sr,
-                    "packetsTotal": gAudioPacketsSent
-                ]
-            ]
-            if let jsonData = try? JSONSerialization.data(withJSONObject: logData),
-               let jsonString = String(data: jsonData, encoding: .utf8) {
-                if let handle = FileHandle(forWritingAtPath: logPath) {
-                    handle.seekToEndOfFile()
-                    handle.write((jsonString + "\n").data(using: .utf8)!)
-                    handle.closeFile()
-                } else if FileManager.default.createFile(atPath: logPath, contents: (jsonString + "\n").data(using: .utf8)) {
-                    // File created
-                }
-            }
-        }
-        // #endregion
         
         // Update UI periodically
         if packetCount > 0 && gAudioPacketsSent % 10 == 0 {
