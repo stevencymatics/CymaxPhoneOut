@@ -443,63 +443,39 @@ struct MenuBarView: View {
     // MARK: - Controls
 
     private var controlsView: some View {
-        VStack(spacing: 10) {
-            Button(action: {
-                if appState.isServerRunning {
-                    appState.stopServer()
-                } else {
-                    appState.startServer()
-                }
-            }) {
-                HStack(spacing: 8) {
-                    Image(systemName: appState.isServerRunning ? "stop.fill" : "play.fill")
-                        .font(.system(size: 14))
-                    Text(appState.isServerRunning ? "Stop" : "Start")
-                        .font(.system(size: 14, weight: .semibold))
-                }
-                .foregroundColor(appState.isServerRunning ? .white : .black)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(
-                    Group {
-                        if appState.isServerRunning {
-                            Color.red.opacity(0.8)
-                        } else {
-                            LinearGradient(
-                                colors: [.mixLinkCyan, .mixLinkTeal],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        }
-                    }
-                )
-                .cornerRadius(10)
-                .shadow(color: appState.isServerRunning ? .clear : Color.mixLinkCyan.opacity(0.3), radius: 8)
-            }
-            .buttonStyle(.plain)
-
-            // Mute Mac speakers toggle
+        Button(action: {
             if appState.isServerRunning {
-                Button(action: { appState.toggleMacMute() }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: appState.isMacMuted ? "speaker.slash.fill" : "speaker.2.fill")
-                            .font(.system(size: 12))
-                        Text(appState.isMacMuted ? "Unmute Mac" : "Mute Mac")
-                            .font(.system(size: 12, weight: .medium))
-                    }
-                    .foregroundColor(appState.isMacMuted ? .orange : .white.opacity(0.7))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 9)
-                    .background(appState.isMacMuted ? Color.orange.opacity(0.15) : Color.white.opacity(0.05))
-                    .cornerRadius(8)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(appState.isMacMuted ? Color.orange.opacity(0.3) : Color.white.opacity(0.1), lineWidth: 1)
-                    )
-                }
-                .buttonStyle(.plain)
+                appState.stopServer()
+            } else {
+                appState.startServer()
             }
+        }) {
+            HStack(spacing: 8) {
+                Image(systemName: appState.isServerRunning ? "stop.fill" : "play.fill")
+                    .font(.system(size: 14))
+                Text(appState.isServerRunning ? "Stop" : "Start")
+                    .font(.system(size: 14, weight: .semibold))
+            }
+            .foregroundColor(appState.isServerRunning ? .white : .black)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(
+                Group {
+                    if appState.isServerRunning {
+                        Color.red.opacity(0.8)
+                    } else {
+                        LinearGradient(
+                            colors: [.mixLinkCyan, .mixLinkTeal],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    }
+                }
+            )
+            .cornerRadius(10)
+            .shadow(color: appState.isServerRunning ? .clear : Color.mixLinkCyan.opacity(0.3), radius: 8)
         }
+        .buttonStyle(.plain)
     }
     
     // MARK: - Log View
