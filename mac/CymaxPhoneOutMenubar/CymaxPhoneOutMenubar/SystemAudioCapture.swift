@@ -79,15 +79,9 @@ class SystemAudioCapture: NSObject, SCStreamDelegate, SCStreamOutput {
     func start() async throws {
         guard !isCapturing else { return }
         
-        // Check permission using ScreenCaptureKit (reliable on macOS 15+)
-        let hasPermission = await SystemAudioCapture.checkPermissionAsync()
-        if !hasPermission {
-            throw CaptureError.notAuthorized
-        }
-        
         onStatusUpdate?("Setting up audio capture...")
 
-        // Get available content
+        // Get available content — this will fail with an auth error if permission isn't granted
         let availableContent: SCShareableContent
         do {
             availableContent = try await SCShareableContent.excludingDesktopWindows(
@@ -95,7 +89,8 @@ class SystemAudioCapture: NSObject, SCStreamDelegate, SCStreamOutput {
                 onScreenWindowsOnly: false
             )
         } catch {
-            throw error
+            // On macOS 15+, permission errors come through here
+            throw CaptureError.notAuthorized
         }
         
         // We need at least one display to create a stream

@@ -10,6 +10,7 @@ import SwiftUI
 import Combine
 import AppKit
 import Network
+import CoreAudio
 
 // Legacy types kept for compatibility with unused files
 struct DiscoveredDevice: Identifiable, Hashable {
@@ -45,6 +46,10 @@ class AppState: ObservableObject {
     
     // Stats
     @Published var packetsSent: Int = 0
+
+    // Mac audio mute
+    @Published var isMacMuted: Bool = false
+    private var wasMutedBeforeStart: Bool = false
     
     // Logging
     @Published var logMessages: [LogMessage] = []
@@ -81,13 +86,8 @@ class AppState: ObservableObject {
         setupSleepWakeObservers()
         startNetworkMonitor()
 
-        // Check permission asynchronously using ScreenCaptureKit (more reliable than CGPreflight on macOS 15+)
-        Task {
-            let hasPermission = await SystemAudioCapture.checkPermissionAsync()
-            if !hasPermission {
-                self.needsPermission = true
-            }
-        }
+        // Don't proactively check permission — let capture attempt handle it.
+        // On macOS 26, the proactive check can false-negative even when permission is granted.
     }
     
     private func setupSleepWakeObservers() {
@@ -395,12 +395,59 @@ class AppState: ObservableObject {
         isServerRunning = false
         webClientsConnected = 0
         packetsSent = 0
-        
+
+        // Restore Mac audio when stopping
+        if isMacMuted {
+            setSystemOutputMute(false)
+            isMacMuted = false
+            log("Mac audio restored")
+        }
+
         log("Server stopped")
     }
     
+    // MARK: - Mac Audio Mute
+
+    func toggleMacMute() {
+        let newState = !isMacMuted
+        setSystemOutputMute(newState)
+        isMacMuted = newState
+        log(newState ? "Mac audio muted" : "Mac audio unmuted")
+    }
+
+    private func setSystemOutputMute(_ mute: Bool) {
+        var defaultOutputDeviceID = AudioDeviceID(0)
+        var propertySize = UInt32(MemoryLayout<AudioDeviceID>.size)
+
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        let status = AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address, 0, nil,
+            &propertySize, &defaultOutputDeviceID
+        )
+        guard status == noErr else { return }
+
+        var muted: UInt32 = mute ? 1 : 0
+        address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyMute,
+            mScope: kAudioDevicePropertyScopeOutput,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        AudioObjectSetPropertyData(
+            defaultOutputDeviceID,
+            &address, 0, nil,
+            UInt32(MemoryLayout<UInt32>.size), &muted
+        )
+    }
+
     // MARK: - Audio Capture
-    
+
     /// Open System Settings to Screen Recording permission pane
     func openScreenRecordingSettings() {
         SystemAudioCapture.openSystemSettings()
