@@ -299,19 +299,19 @@
 				DEVELOPMENT_TEAM = 2T2WR8NY68;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Mix Link";
-				INFOPLIST_KEY_CFBundleName = "Mix Link";
+				INFOPLIST_KEY_CFBundleDisplayName = "Cymatics Link";
+				INFOPLIST_KEY_CFBundleName = "Cymatics Link";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2024 Cymatics. All rights reserved.";
-				INFOPLIST_KEY_NSScreenCaptureUsageDescription = "Mix Link needs Screen Recording permission to capture system audio and stream it to your phone.";
+				INFOPLIST_KEY_NSScreenCaptureUsageDescription = "Cymatics Link needs Screen Recording permission to capture system audio and stream it to your phone.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.cymatics.mixlink;
-				PRODUCT_NAME = "Mix Link";
+				PRODUCT_NAME = "Cymatics Link";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 			};
@@ -328,19 +328,19 @@
 				DEVELOPMENT_TEAM = 2T2WR8NY68;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Mix Link";
-				INFOPLIST_KEY_CFBundleName = "Mix Link";
+				INFOPLIST_KEY_CFBundleDisplayName = "Cymatics Link";
+				INFOPLIST_KEY_CFBundleName = "Cymatics Link";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2024 Cymatics. All rights reserved.";
-				INFOPLIST_KEY_NSScreenCaptureUsageDescription = "Mix Link needs Screen Recording permission to capture system audio and stream it to your phone.";
+				INFOPLIST_KEY_NSScreenCaptureUsageDescription = "Cymatics Link needs Screen Recording permission to capture system audio and stream it to your phone.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.cymatics.mixlink;
-				PRODUCT_NAME = "Mix Link";
+				PRODUCT_NAME = "Cymatics Link";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 			};

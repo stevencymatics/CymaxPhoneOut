@@ -75,7 +75,7 @@ class AppState: ObservableObject {
     private nonisolated(unsafe) var networkDebounceWork: DispatchWorkItem?
 
     init() {
-        log("Mix Link started")
+        log("Cymatics Link started")
         log("Ready to stream system audio to your phone")
         updateQRCode()
         setupSleepWakeObservers()

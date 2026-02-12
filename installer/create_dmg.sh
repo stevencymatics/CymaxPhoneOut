@@ -13,8 +13,8 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 # App to package
 APP_PATH="${1:-$PROJECT_ROOT/build/CymaxPhoneOutMenubar.app}"
-APP_NAME="Mix Link"
-DMG_NAME="MixLink"
+APP_NAME="Cymatics Link"
+DMG_NAME="CymaticsLink"
 DMG_OUTPUT="$PROJECT_ROOT/${DMG_NAME}.dmg"
 VOLUME_NAME="$APP_NAME"
 
@@ -49,7 +49,7 @@ warn() { echo -e "${YELLOW}⚠ $1${NC}"; }
 error() { echo -e "${RED}✗ $1${NC}"; exit 1; }
 
 echo "=========================================="
-echo "  Mix Link - DMG Installer Creator"
+echo "  Cymatics Link - DMG Installer Creator"
 echo "=========================================="
 echo ""
 

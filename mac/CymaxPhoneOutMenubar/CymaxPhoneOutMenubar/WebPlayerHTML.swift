@@ -18,7 +18,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Mix Link</title>
+    <title>Cymatics Link</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='none' stroke='%2300d4ff' stroke-width='6'/><polygon points='40,30 40,70 72,50' fill='%2300d4ff'/></svg>">
     <style>
         * {
@@ -313,7 +313,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
 </head>
 <body>
     <div class="container">
-        <h1>Mix <span style="color: #00d4ff; font-weight: 700;">Link</span></h1>
+        <h1>Cymatics <span style="color: #00d4ff; font-weight: 700;">Link</span></h1>
         <p class="subtitle" id="subtitle">Stream audio from your Computer.</p>
         
         <button class="play-button" id="playBtn" onclick="togglePlay()">
@@ -1239,7 +1239,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
         function setupMediaSession() {
             if ('mediaSession' in navigator) {
                 navigator.mediaSession.metadata = new MediaMetadata({
-                    title: 'Mix Link',
+                    title: 'Cymatics Link',
                     artist: 'Streaming from Mac',
                     album: 'System Audio',
                     artwork: [

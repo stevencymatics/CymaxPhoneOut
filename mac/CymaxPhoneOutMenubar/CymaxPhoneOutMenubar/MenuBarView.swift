@@ -15,7 +15,6 @@ extension Color {
 
 struct MenuBarView: View {
     @EnvironmentObject var appState: AppState
-    @State private var showingLog = false
     @State private var hoveringTrafficLights = false
     
     var body: some View {
@@ -52,20 +51,6 @@ struct MenuBarView: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 16)
                 
-                if showingLog {
-                    Divider()
-                        .background(Color.white.opacity(0.1))
-                    logView
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 12)
-                }
-                
-                // Footer
-                Divider()
-                    .background(Color.white.opacity(0.1))
-                footerView
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 10)
             }
             .blur(radius: appState.needsPermission ? 8 : 0)
             .opacity(appState.needsPermission ? 0.3 : 1)
@@ -103,7 +88,7 @@ struct MenuBarView: View {
                         .font(.system(size: 18, weight: .bold))
                         .foregroundColor(.white)
                     
-                    Text("Mix Link needs Screen Recording access to capture your Mac's audio")
+                    Text("Cymatics Link needs Screen Recording access to capture your Mac's audio")
                         .font(.system(size: 11))
                         .foregroundColor(.gray)
                         .multilineTextAlignment(.center)
@@ -114,7 +99,7 @@ struct MenuBarView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     permissionStep(number: 1, text: "Click \"Open Settings\" below")
                     permissionStep(number: 2, text: "Find \"Screen & System Audio\" section and click +")
-                    permissionStep(number: 3, text: "Select \"Mix Link\" from the list")
+                    permissionStep(number: 3, text: "Select \"Cymatics Link\" from the list")
                     permissionStep(number: 4, text: "Enter password if prompted")
                 }
                 .padding(14)
@@ -241,9 +226,9 @@ struct MenuBarView: View {
     
     private var headerView: some View {
         HStack {
-            // Mix Link branding
+            // Cymatics Link branding
             HStack(spacing: 6) {
-                Text("Mix")
+                Text("Cymatics")
                     .font(.system(size: 20, weight: .medium))
                     .foregroundColor(.white)
                 Text("Link")
@@ -478,81 +463,6 @@ struct MenuBarView: View {
         .buttonStyle(.plain)
     }
     
-    // MARK: - Log View
-    
-    private var logView: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("Debug Log")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.gray)
-                Spacer()
-                Button("Copy") {
-                    let logText = appState.logMessages.map { "[\($0.formattedTimestamp)] \($0.level.rawValue): \($0.message)" }.joined(separator: "\n")
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(logText, forType: .string)
-                }
-                .font(.system(size: 9))
-                .foregroundColor(.mixLinkCyan)
-                .buttonStyle(.plain)
-            }
-            
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 2) {
-                    ForEach(appState.logMessages.suffix(30)) { log in
-                        HStack(alignment: .top, spacing: 6) {
-                            Text(log.formattedTimestamp)
-                                .font(.system(size: 8, design: .monospaced))
-                                .foregroundColor(.gray.opacity(0.6))
-                            Text(log.message)
-                                .font(.system(size: 9))
-                                .foregroundColor(logColor(for: log.level))
-                                .textSelection(.enabled)
-                        }
-                    }
-                }
-                .padding(8)
-            }
-            .frame(height: 100)
-            .background(Color.black.opacity(0.3))
-            .cornerRadius(6)
-        }
-    }
-    
-    private func logColor(for level: LogLevel) -> Color {
-        switch level {
-        case .debug: return .gray
-        case .info: return .mixLinkCyan
-        case .warning: return .orange
-        case .error: return .red
-        }
-    }
-    
-    // MARK: - Footer
-    
-    private var footerView: some View {
-        HStack {
-            Button(action: { showingLog.toggle() }) {
-                Image(systemName: showingLog ? "chevron.down" : "terminal")
-                    .font(.system(size: 12))
-                    .foregroundColor(.gray)
-            }
-            .buttonStyle(.plain)
-            .help("Toggle debug log")
-            
-            Spacer()
-            
-            Text("v1.0")
-                .font(.system(size: 9))
-                .foregroundColor(.gray.opacity(0.5))
-            
-            Spacer()
-            
-            // Empty spacer to balance the layout (power button removed, using traffic lights now)
-            Color.clear
-                .frame(width: 12, height: 12)
-        }
-    }
     
     // MARK: - App Restart
     
