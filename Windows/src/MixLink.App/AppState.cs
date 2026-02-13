@@ -74,7 +74,7 @@ public sealed class AppState : IDisposable
 
     public AppState()
     {
-        Log("Mix Link started", LogLevel.Info);
+        Log("Cymatics Link started", LogLevel.Info);
         Log("Ready to stream system audio to your phone", LogLevel.Info);
         UpdateQrCode();
         SetupPowerEvents();

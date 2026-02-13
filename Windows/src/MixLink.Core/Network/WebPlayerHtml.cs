@@ -19,7 +19,7 @@ public static class WebPlayerHtml
 <head>
     <meta charset=""UTF-8"">
     <meta name=""viewport"" content=""width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover"">
-    <title>Mix Link</title>
+    <title>Cymatics Link</title>
     <link rel=""icon"" href=""data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='none' stroke='%2300d4ff' stroke-width='6'/><polygon points='40,30 40,70 72,50' fill='%2300d4ff'/></svg>"">
     <style>
         * {{
@@ -182,63 +182,38 @@ public static class WebPlayerHtml
 
         .stats {{
             margin-top: 10px;
-            font-size: 1.1rem;
-            color: #666;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
         }}
+
+        .signal-bars {{
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+            height: 18px;
+        }}
+
+        .signal-bars .bar {{
+            width: 5px;
+            border-radius: 1px;
+            background: #333;
+            transition: background 0.3s;
+        }}
+
+        .signal-bars .bar:nth-child(1) {{ height: 5px; }}
+        .signal-bars .bar:nth-child(2) {{ height: 10px; }}
+        .signal-bars .bar:nth-child(3) {{ height: 16px; }}
+
+        .signal-bars.good .bar {{ background: #4ade80; }}
+        .signal-bars.fair .bar:nth-child(1),
+        .signal-bars.fair .bar:nth-child(2) {{ background: #fbbf24; }}
+        .signal-bars.poor .bar:nth-child(1) {{ background: #ef4444; }}
 
         .error-message {{
             color: #ef4444;
             margin-top: 20px;
             font-size: 0.85rem;
-        }}
-
-        .debug-section {{
-            margin-top: 15px;
-            padding-top: 10px;
-            border-top: 1px solid #222;
-        }}
-
-        .debug-toggle {{
-            background: none;
-            border: 1px solid #333;
-            color: #666;
-            padding: 8px 16px;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            cursor: pointer;
-        }}
-
-        .debug-log {{
-            margin-top: 15px;
-            background: rgba(0,0,0,0.4);
-            border-radius: 8px;
-            padding: 12px;
-            text-align: left;
-            max-height: 150px;
-            overflow-y: auto;
-            font-family: monospace;
-            font-size: 0.65rem;
-            color: #666;
-        }}
-
-        .debug-log .log-entry {{
-            margin: 2px 0;
-            word-break: break-all;
-        }}
-
-        .debug-log .log-info {{ color: #4ade80; }}
-        .debug-log .log-warn {{ color: #fbbf24; }}
-        .debug-log .log-error {{ color: #ef4444; }}
-
-        .copy-btn {{
-            margin-top: 10px;
-            padding: 6px 12px;
-            background: transparent;
-            border: 1px solid #333;
-            border-radius: 4px;
-            color: #666;
-            font-size: 0.7rem;
-            cursor: pointer;
         }}
 
         .reconnect-overlay {{
@@ -285,7 +260,7 @@ public static class WebPlayerHtml
 </head>
 <body>
     <div class=""container"">
-        <h1>Mix <span style=""color: #00d4ff; font-weight: 700;"">Link</span></h1>
+        <h1>Cymatics <span style=""color: #00d4ff; font-weight: 700;"">Link</span></h1>
         <p class=""subtitle"" id=""subtitle"">Stream audio from your Computer.</p>
 
         <button class=""play-button"" id=""playBtn"" onclick=""togglePlay()"">
@@ -317,8 +292,13 @@ public static class WebPlayerHtml
             <div class=""viz-bar"" id=""bar15""></div>
         </div>
 
+
         <div class=""stats"" id=""statsDisplay"">
-            Packets: <span id=""packets"">0</span> | Buffer: <span id=""buffer"">0ms</span>
+            <div class=""signal-bars"" id=""signalBars"">
+                <div class=""bar""></div>
+                <div class=""bar""></div>
+                <div class=""bar""></div>
+            </div>
         </div>
 
         <div class=""error-message"" id=""errorMsg""></div>
@@ -329,11 +309,6 @@ public static class WebPlayerHtml
             <span id=""sampleRate"">-</span>
         </div>
 
-        <div class=""debug-section"">
-            <button class=""debug-toggle"" onclick=""toggleDebug()"">Show Debug Log</button>
-            <div class=""debug-log hidden"" id=""debugLog""></div>
-            <button class=""copy-btn hidden"" id=""copyBtn"" onclick=""copyLog()"">Copy Log</button>
-        </div>
     </div>
 
     <audio id=""outputAudio"" playsinline style=""display:none""></audio>
@@ -429,28 +404,8 @@ public static class WebPlayerHtml
             }}
         }}
 
-        function toggleDebug() {{
-            const log = document.getElementById('debugLog');
-            const copyBtn = document.getElementById('copyBtn');
-            log.classList.toggle('hidden');
-            copyBtn.classList.toggle('hidden');
-        }}
-
-        const maxLogEntries = 50;
         function debugLog(msg, level = 'info') {{
-            const logDiv = document.getElementById('debugLog');
-            const time = new Date().toLocaleTimeString('en-US', {{hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3}});
-            const entry = document.createElement('div');
-            entry.className = 'log-entry log-' + level;
-            entry.textContent = '[' + time + '] ' + msg;
-            logDiv.appendChild(entry);
-
-            while (logDiv.children.length > maxLogEntries) {{
-                logDiv.removeChild(logDiv.firstChild);
-            }}
-
-            logDiv.scrollTop = logDiv.scrollHeight;
-            console.log('[MixLink] ' + msg);
+            if (level !== 'info') console.log('[Cymax] ' + msg);
         }}
 
         function updateStatus(status, text) {{
@@ -598,9 +553,6 @@ public static class WebPlayerHtml
             readPos = 0;
             isPrebuffering = true;
             isInitialStart = true;
-            processCallCount = 0;
-            processStartTime = 0;
-            totalFramesConsumed = 0;
 
             updateMediaSessionState(false);
 
@@ -881,6 +833,7 @@ public static class WebPlayerHtml
                 resampleRatio = outputRate / sourceRate;
                 debugLog('Source rate set from packet: ' + sourceRate + 'Hz, Ratio: ' + resampleRatio.toFixed(4));
                 document.getElementById('sampleRate').textContent = outputRate + 'Hz (src:' + sourceRate + ')';
+
             }}
 
             if (packetsReceived === 1) {{
@@ -929,29 +882,29 @@ public static class WebPlayerHtml
 
             if (packetsReceived % 50 === 0) {{
                 const bufferMs = Math.round((bufferedSamples / 2) / outputRate * 1000);
-                document.getElementById('packets').textContent = packetsReceived;
-                document.getElementById('buffer').textContent = bufferMs + 'ms';
-
-                if (packetsReceived % 200 === 0) {{
-                    debugLog('Stats: packets=' + packetsReceived + ', buffer=' + bufferMs + 'ms');
+                const bars = document.getElementById('signalBars');
+                if (bufferMs > 60) {{
+                    bars.className = 'signal-bars good';
+                }} else if (bufferMs < 20) {{
+                    bars.className = 'signal-bars poor';
+                }} else {{
+                    bars.className = 'signal-bars fair';
                 }}
             }}
+
+            const leftChannel = new Float32Array(audioData.length / 2);
+            for (let i = 0; i < leftChannel.length; i++) {{
+                leftChannel[i] = audioData[i * 2];
+            }}
+            updateVisualizer(leftChannel);
         }}
 
         let underrunCount = 0;
-        let processCallCount = 0;
-        let processStartTime = 0;
-        let totalFramesConsumed = 0;
 
         function processAudio(e) {{
             const outputL = e.outputBuffer.getChannelData(0);
             const outputR = e.outputBuffer.getChannelData(1);
             const frameCount = outputL.length;
-
-            processCallCount++;
-            if (processStartTime === 0) {{
-                processStartTime = performance.now();
-            }}
 
             const samplesNeeded = frameCount * 2;
 
@@ -996,7 +949,6 @@ public static class WebPlayerHtml
             }}
 
             bufferedSamples -= samplesNeeded;
-            totalFramesConsumed += frameCount;
 
             updateVisualizer(outputL);
         }}
@@ -1007,54 +959,6 @@ public static class WebPlayerHtml
                 debugLog('Volume set to ' + value + '%');
             }}
         }}
-
-        function copyLog() {{
-            const logDiv = document.getElementById('debugLog');
-            const entries = Array.from(logDiv.querySelectorAll('.log-entry')).map(e => e.textContent);
-            const text = entries.join('\n');
-
-            if (navigator.clipboard) {{
-                navigator.clipboard.writeText(text).then(() => {{
-                    debugLog('Log copied to clipboard!');
-                }}).catch(err => {{
-                    debugLog('Copy failed: ' + err, 'error');
-                    fallbackCopy(text);
-                }});
-            }} else {{
-                fallbackCopy(text);
-            }}
-        }}
-
-        function fallbackCopy(text) {{
-            const textarea = document.createElement('textarea');
-            textarea.value = text;
-            textarea.style.position = 'fixed';
-            textarea.style.opacity = '0';
-            document.body.appendChild(textarea);
-            textarea.select();
-            try {{
-                document.execCommand('copy');
-                debugLog('Log copied! (fallback)');
-            }} catch (e) {{
-                debugLog('Copy failed', 'error');
-            }}
-            document.body.removeChild(textarea);
-        }}
-
-        debugLog('Mix Link Web Player loaded');
-        debugLog('Will connect to ws://' + WS_HOST + ':' + WS_PORT);
-
-        document.addEventListener('visibilitychange', () => {{
-            if (!isPlaying || !gainNode) return;
-
-            if (document.hidden) {{
-                debugLog('Tab hidden - muting audio');
-                gainNode.gain.value = 0;
-            }} else {{
-                debugLog('Tab visible - unmuting audio');
-                gainNode.gain.value = 1;
-            }}
-        }});
 
         if ('wakeLock' in navigator) {{
             navigator.wakeLock.request('screen').catch(() => {{}});
@@ -1074,7 +978,7 @@ public static class WebPlayerHtml
         function setupMediaSession() {{
             if ('mediaSession' in navigator) {{
                 navigator.mediaSession.metadata = new MediaMetadata({{
-                    title: 'Mix Link',
+                    title: 'Cymatics Link',
                     artist: 'Streaming from PC',
                     album: 'System Audio',
                     artwork: [

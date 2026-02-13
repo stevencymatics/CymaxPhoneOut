@@ -31,7 +31,7 @@ public sealed class QrPopupForm : Form
         // Title
         var titleLabel = new Label
         {
-            Text = "Mix Link",
+            Text = "Cymatics Link",
             Font = new Font("Segoe UI", 16, FontStyle.Bold),
             ForeColor = Color.White,
             AutoSize = false,

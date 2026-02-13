@@ -18,8 +18,8 @@ internal static class Program
         if (!createdNew)
         {
             MessageBox.Show(
-                "Mix Link is already running.\nCheck the system tray.",
-                "Mix Link",
+                "Cymatics Link is already running.\nCheck the system tray.",
+                "Cymatics Link",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information
             );
@@ -36,7 +36,7 @@ internal static class Program
         {
             MessageBox.Show(
                 $"An error occurred: {e.Exception.Message}",
-                "Mix Link Error",
+                "Cymatics Link Error",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error
             );
@@ -48,7 +48,7 @@ internal static class Program
             {
                 MessageBox.Show(
                     $"A fatal error occurred: {ex.Message}",
-                    "Mix Link Error",
+                    "Cymatics Link Error",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error
                 );

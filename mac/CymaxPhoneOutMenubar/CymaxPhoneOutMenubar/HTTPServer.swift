@@ -389,12 +389,11 @@ class HTTPServer {
     
     private func sendAndClose(connection: NWConnection, response: String) {
         let data = Data(response.utf8)
-        
-        connection.send(content: data, completion: .contentProcessed { error in
+
+        connection.send(content: data, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { error in
             if let error = error {
                 print("HTTPServer: Send error - \(error)")
             }
-            connection.cancel()
         })
     }
     

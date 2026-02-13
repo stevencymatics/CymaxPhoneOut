@@ -36,14 +36,14 @@ public class WebPlayerHtmlTests
     }
 
     [Fact]
-    public void GetHtml_ContainsMixLinkTitle()
+    public void GetHtml_ContainsCymaticsLinkTitle()
     {
         // Act
         var html = WebPlayerHtml.GetHtml(19621, "192.168.1.100", "TestPC");
 
         // Assert
-        Assert.Contains("<title>Mix Link</title>", html);
-        Assert.Contains("Mix <span", html); // Title in body
+        Assert.Contains("<title>Cymatics Link</title>", html);
+        Assert.Contains("Cymatics <span", html); // Title in body
     }
 
     [Fact]

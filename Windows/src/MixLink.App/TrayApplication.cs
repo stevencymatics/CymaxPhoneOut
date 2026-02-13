@@ -40,7 +40,7 @@ public sealed class TrayApplication : ApplicationContext
         _trayIcon = new NotifyIcon
         {
             Icon = CreateTrayIcon(false),
-            Text = "Mix Link - Click to show QR",
+            Text = "Cymatics Link - Click to show QR",
             ContextMenuStrip = contextMenu,
             Visible = true
         };
@@ -123,8 +123,8 @@ public sealed class TrayApplication : ApplicationContext
 
         _trayIcon.Icon = CreateTrayIcon(isActive);
         _trayIcon.Text = _appState.IsServerRunning
-            ? $"Mix Link - {_appState.WebClientsConnected} clients"
-            : "Mix Link - Stopped";
+            ? $"Cymatics Link - {_appState.WebClientsConnected} clients"
+            : "Cymatics Link - Stopped";
 
         _startStopItem.Text = _appState.IsServerRunning ? "Stop" : "Start";
     }
