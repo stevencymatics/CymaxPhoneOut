@@ -294,25 +294,40 @@ struct MenuBarView: View {
                         Text("Scan with your phone")
                             .font(.system(size: 11))
                             .foregroundColor(.gray)
-                        
-                        Button(action: {
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(url, forType: .string)
-                        }) {
-                            HStack(spacing: 6) {
-                                Text(url)
-                                    .font(.system(size: 10, design: .monospaced))
-                                    .lineLimit(1)
-                                Image(systemName: "doc.on.doc")
-                                    .font(.system(size: 9))
+
+                        HStack(spacing: 6) {
+                            Button(action: {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(url, forType: .string)
+                            }) {
+                                HStack(spacing: 6) {
+                                    Text(url)
+                                        .font(.system(size: 10, design: .monospaced))
+                                        .lineLimit(1)
+                                    Image(systemName: "doc.on.doc")
+                                        .font(.system(size: 9))
+                                }
+                                .foregroundColor(.mixLinkCyan)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Color.mixLinkCyan.opacity(0.1))
+                                .cornerRadius(6)
                             }
-                            .foregroundColor(.mixLinkCyan)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(Color.mixLinkCyan.opacity(0.1))
-                            .cornerRadius(6)
+                            .buttonStyle(.plain)
+
+                            Button(action: {
+                                appState.refreshNetwork()
+                            }) {
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundColor(.mixLinkCyan)
+                                    .frame(width: 26, height: 26)
+                                    .background(Color.mixLinkCyan.opacity(0.1))
+                                    .cornerRadius(6)
+                            }
+                            .buttonStyle(.plain)
+                            .help("Refresh IP address")
                         }
-                        .buttonStyle(.plain)
                     }
                 }
             } else {

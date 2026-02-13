@@ -406,8 +406,29 @@ class AppState: ObservableObject {
         }
     }
     
+    // MARK: - Network Refresh
+
+    /// Re-detect IP address and update QR code + served HTML without restarting the server
+    func refreshNetwork() {
+        guard isServerRunning else { return }
+
+        guard let localIP = QRCodeGenerator.getLocalIPAddress() else {
+            log("Cannot detect IP address", level: .warning)
+            return
+        }
+
+        let hostName = Host.current().localizedName ?? "Mac"
+        let htmlContent = getWebPlayerHTML(wsPort: httpPort, hostIP: localIP, hostName: hostName)
+
+        httpServer?.htmlContent = htmlContent
+        webPlayerURL = "http://\(localIP):\(httpPort)"
+        updateQRCode()
+
+        log("Network refreshed: \(webPlayerURL ?? "unknown")")
+    }
+
     // MARK: - QR Code
-    
+
     private func updateQRCode() {
         guard let url = QRCodeGenerator.getWebPlayerURL(httpPort: httpPort) else {
             qrCodeImage = nil

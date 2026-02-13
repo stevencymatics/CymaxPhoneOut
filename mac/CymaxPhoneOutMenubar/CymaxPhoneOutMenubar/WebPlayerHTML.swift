@@ -363,8 +363,9 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
         // Visualizer state
         const NUM_BARS = 16;
         let vizBars = [];
-        let vizLevels = new Array(NUM_BARS).fill(0);
         let vizAnimFrame = null;
+        let analyserNode = null;
+        let vizFreqData = null;
         
         function initVisualizer() {
             vizBars = [];
@@ -373,29 +374,18 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
             }
         }
         
-        function updateVisualizer(samples) {
-            if (!samples || samples.length === 0) return;
-            
-            // Calculate RMS for different frequency bands (simplified)
-            const samplesPerBar = Math.floor(samples.length / NUM_BARS);
-            for (let i = 0; i < NUM_BARS; i++) {
-                let sum = 0;
-                const start = i * samplesPerBar;
-                for (let j = 0; j < samplesPerBar && (start + j) < samples.length; j++) {
-                    sum += Math.abs(samples[start + j]);
-                }
-                const avg = sum / samplesPerBar;
-                // Smooth the levels
-                vizLevels[i] = vizLevels[i] * 0.7 + avg * 0.3;
-            }
-        }
-        
         function animateVisualizer() {
-            for (let i = 0; i < NUM_BARS; i++) {
-                if (vizBars[i]) {
-                    // Scale to pixel height (6-110px range for compact layout)
-                    const height = Math.max(6, Math.min(110, vizLevels[i] * 400));
-                    vizBars[i].style.height = height + 'px';
+            if (analyserNode && vizFreqData) {
+                analyserNode.getByteFrequencyData(vizFreqData);
+                // Map 32 frequency bins to 16 bars (2 bins per bar)
+                for (let i = 0; i < NUM_BARS; i++) {
+                    const bin1 = vizFreqData[i * 2] || 0;
+                    const bin2 = vizFreqData[i * 2 + 1] || 0;
+                    const avg = (bin1 + bin2) / 2;
+                    const height = Math.max(6, Math.min(110, (avg / 255) * 110));
+                    if (vizBars[i]) {
+                        vizBars[i].style.height = height + 'px';
+                    }
                 }
             }
             if (isPlaying) {
@@ -404,7 +394,6 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
         }
         
         function resetVisualizer() {
-            vizLevels.fill(0);
             for (let i = 0; i < NUM_BARS; i++) {
                 if (vizBars[i]) {
                     vizBars[i].style.height = '6px';
@@ -505,11 +494,19 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
                 gainNode = audioContext.createGain();
                 gainNode.connect(mediaStreamDest);  // Connect to MediaStream, not destination
                 debugLog('Gain node created and connected to MediaStream');
-                
+
+                // Create analyser node for visualizer (FFT on live audio)
+                analyserNode = audioContext.createAnalyser();
+                analyserNode.fftSize = 64;  // 32 frequency bins
+                analyserNode.smoothingTimeConstant = 0.7;
+                vizFreqData = new Uint8Array(analyserNode.frequencyBinCount);
+                analyserNode.connect(gainNode);
+                debugLog('Analyser node created (fftSize: 64, bins: ' + analyserNode.frequencyBinCount + ')');
+
                 // Create script processor for audio output (smaller buffer = lower latency)
                 scriptNode = audioContext.createScriptProcessor(512, 0, 2);
                 scriptNode.onaudioprocess = processAudio;
-                scriptNode.connect(gainNode);
+                scriptNode.connect(analyserNode);
                 debugLog('Script processor created (buffer: 512 frames, ~11ms)');
                 
                 // Route MediaStream through HTML5 audio element (bypasses iOS silent mode)
@@ -576,7 +573,9 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
                 audioContext.close();
                 audioContext = null;
             }
-            
+
+            analyserNode = null;
+            vizFreqData = null;
             mediaStreamDest = null;
             
             isPlaying = false;
@@ -954,13 +953,6 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
                 }
             }
 
-            // Update visualizer directly from incoming audio (more reliable than ScriptProcessor)
-            // Extract left channel samples (interleaved L R L R -> just L)
-            const leftChannel = new Float32Array(audioData.length / 2);
-            for (let i = 0; i < leftChannel.length; i++) {
-                leftChannel[i] = audioData[i * 2];
-            }
-            updateVisualizer(leftChannel);
         }
         
         let underrunCount = 0;
@@ -1020,9 +1012,6 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
             }
             
             bufferedSamples -= samplesNeeded;
-
-            // Update visualizer with current audio
-            updateVisualizer(outputL);
         }
         
         function setVolume(value) {
