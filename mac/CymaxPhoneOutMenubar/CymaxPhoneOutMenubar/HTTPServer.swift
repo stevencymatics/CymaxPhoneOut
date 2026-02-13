@@ -39,7 +39,9 @@ class HTTPServer {
     
     private func log(_ message: String) {
         let timestamp = ISO8601DateFormatter().string(from: Date())
-        print("[\(timestamp)] HTTP/WS: \(message)")
+        let line = "[\(timestamp)] HTTP/WS: \(message)\n"
+        print(line, terminator: "")
+        debugLogToFile(line)
     }
     
     init(port: UInt16 = 19621) {

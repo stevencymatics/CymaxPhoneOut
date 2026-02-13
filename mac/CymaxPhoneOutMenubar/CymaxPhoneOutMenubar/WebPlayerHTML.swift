@@ -122,7 +122,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
         .visualizer-container {
             width: 100%;
             height: 120px;
-            margin: 10px 0 15px 0;
+            margin: 30px 0 15px 0;
             display: flex;
             align-items: flex-end;
             justify-content: center;
@@ -351,9 +351,9 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
         let bufferedSamples = 0;
         
         // Target buffer level (samples) - optimized for low latency
-        const TARGET_BUFFER_MS = 10;   // Ultra-low latency
+        const TARGET_BUFFER_MS = 40;   // Balance of low latency and WiFi jitter tolerance
         const INITIAL_PREBUFFER_MS = 5;   // Near-zero latency start
-        const REBUFFER_MS = 10;           // Quick recovery after underrun
+        const REBUFFER_MS = 30;           // Quick recovery after underrun
         let targetBufferSamples = 48000 * 2 * (TARGET_BUFFER_MS / 1000);
         let prebufferSamples = 48000 * 2 * (INITIAL_PREBUFFER_MS / 1000);
         let rebufferSamples = 48000 * 2 * (REBUFFER_MS / 1000);
@@ -707,6 +707,12 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
                     reconnectAttempts = 0;
                     useHTTPFallback = false;
                     document.getElementById('reconnectOverlay').classList.remove('visible');
+
+                    // Flush audio buffer on reconnect — stale data causes glitches
+                    writePos = 0;
+                    readPos = 0;
+                    bufferedSamples = 0;
+                    isPrebuffering = true;
                 };
                 
                 ws.onclose = (event) => {
@@ -784,6 +790,12 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
                 reconnectAttempts = 0;
                 document.getElementById('reconnectOverlay').classList.remove('visible');
                 lastPacketTime = Date.now();
+
+                // Flush audio buffer on reconnect — stale data causes glitches
+                writePos = 0;
+                readPos = 0;
+                bufferedSamples = 0;
+                isPrebuffering = true;
                 
                 // Watchdog: only act when stream is truly dead (long timeout)
                 // Brief WiFi pauses are absorbed by the audio buffer — don't overreact

@@ -443,7 +443,9 @@ class AppState: ObservableObject {
     // MARK: - Logging
     
     func log(_ message: String, level: LogLevel = .info) {
-        print("[\(level.rawValue)] \(message)")
+        let line = "[\(level.rawValue)] \(message)\n"
+        print(line, terminator: "")
+        debugLogToFile(line)
     }
 }
 
@@ -454,6 +456,24 @@ enum LogLevel: String {
     case info = "INFO"
     case warning = "WARN"
     case error = "ERROR"
+}
+
+// MARK: - Debug File Logging
+
+private let debugLogFileHandle: FileHandle? = {
+    let path = "/tmp/cymatics_debug.log"
+    FileManager.default.createFile(atPath: path, contents: nil)
+    return FileHandle(forWritingAtPath: path)
+}()
+private let debugLogLock = NSLock()
+
+func debugLogToFile(_ message: String) {
+    debugLogLock.lock()
+    defer { debugLogLock.unlock() }
+    if let data = message.data(using: .utf8) {
+        debugLogFileHandle?.seekToEndOfFile()
+        debugLogFileHandle?.write(data)
+    }
 }
 
 // MARK: - Audio Processor (Thread-safe using OSAtomic-style counters)

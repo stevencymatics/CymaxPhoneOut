@@ -92,6 +92,7 @@ struct MenuBarView: View {
                         .font(.system(size: 11))
                         .foregroundColor(.gray)
                         .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
                         .padding(.horizontal, 10)
                 }
                 
@@ -101,6 +102,7 @@ struct MenuBarView: View {
                     permissionStep(number: 2, text: "Find \"Screen & System Audio\" section and click +")
                     permissionStep(number: 3, text: "Select \"Cymatics Link\" from the list")
                     permissionStep(number: 4, text: "Enter password if prompted")
+                    permissionStep(number: 5, text: "Ensure your phone and computer are on the same WiFi or Hotspot network")
                 }
                 .padding(14)
                 .background(Color.white.opacity(0.05))
@@ -157,7 +159,7 @@ struct MenuBarView: View {
     }
     
     private func permissionStep(number: Int, text: String) -> some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .center, spacing: 10) {
             // Number circle
             ZStack {
                 Circle()
@@ -167,7 +169,7 @@ struct MenuBarView: View {
                     .font(.system(size: 11, weight: .bold))
                     .foregroundColor(.black)
             }
-            
+
             // Step text - allow wrapping
             Text(text)
                 .font(.system(size: 11))
