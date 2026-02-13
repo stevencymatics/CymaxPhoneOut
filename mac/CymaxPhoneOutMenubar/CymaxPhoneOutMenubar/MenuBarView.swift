@@ -334,7 +334,7 @@ struct MenuBarView: View {
                 }
             } else {
                 // Not running state
-                VStack(spacing: 12) {
+                VStack(spacing: 20) {
                     ZStack {
                         Circle()
                             .stroke(Color.mixLinkCyan.opacity(0.3), lineWidth: 2)
@@ -350,6 +350,7 @@ struct MenuBarView: View {
                         .foregroundColor(.gray)
                 }
                 .frame(height: 150)
+                .padding(.top, 30)
             }
         }
     }

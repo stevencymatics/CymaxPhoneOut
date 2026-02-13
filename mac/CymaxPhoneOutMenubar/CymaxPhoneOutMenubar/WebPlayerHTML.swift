@@ -77,7 +77,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
             border: none;
             background: linear-gradient(135deg, #00d4ff 0%, #00ffd4 100%);
             cursor: pointer;
-            margin: 0 auto 15px;
+            margin: 30px auto 35px;
             transition: all 0.2s;
             display: flex;
             align-items: center;
@@ -121,8 +121,8 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
         /* Visualizer */
         .visualizer-container {
             width: 100%;
-            height: 120px;
-            margin: 30px 0 15px 0;
+            height: 40px;
+            margin: 100px 0 15px 0;
             display: flex;
             align-items: flex-end;
             justify-content: center;
@@ -181,7 +181,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
         }
         
         .stats {
-            margin-top: 10px;
+            margin-top: 30px;
             display: flex;
             align-items: flex-end;
             justify-content: center;
@@ -388,7 +388,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
                     let avg = sum / count;
                     // Boost higher frequencies to compensate for natural energy rolloff
                     avg = Math.min(255, avg * range.boost);
-                    const height = Math.max(6, Math.min(110, (avg / 255) * 110));
+                    const height = Math.max(6, Math.min(40, (avg / 255) * 40));
                     if (vizBars[i]) {
                         vizBars[i].style.height = height + 'px';
                     }
