@@ -119,9 +119,11 @@ class HTTPServer {
             case .failed(let error):
                 self?.log("    [\(endpoint)] FAILED - \(error)")
                 self?.removeWSConnection(connection)
+                self?.removeHTTPStreamConnection(connection)
             case .cancelled:
                 self?.log("    [\(endpoint)] cancelled")
                 self?.removeWSConnection(connection)
+                self?.removeHTTPStreamConnection(connection)
             default:
                 break
             }
@@ -466,9 +468,13 @@ class HTTPServer {
         if !wsConns.isEmpty {
             let frame = createWebSocketFrame(data: data, opcode: 0x02)
             for conn in wsConns {
-                conn.send(content: frame, completion: .contentProcessed { error in
-                    if let error = error {
-                        print("WebSocket send error: \(error)")
+                guard conn.state == .ready else {
+                    self.removeWSConnection(conn)
+                    continue
+                }
+                conn.send(content: frame, completion: .contentProcessed { [weak self] error in
+                    if error != nil {
+                        self?.removeWSConnection(conn)
                     }
                 })
             }
@@ -478,10 +484,13 @@ class HTTPServer {
         httpStreamLock.lock()
         let httpConns = httpStreamConnections
         httpStreamLock.unlock()
-        
+
         if !httpConns.isEmpty {
-            // Send raw audio packet data directly (no chunking overhead)
             for conn in httpConns {
+                guard conn.state == .ready else {
+                    self.removeHTTPStreamConnection(conn)
+                    continue
+                }
                 conn.send(content: data, completion: .contentProcessed { [weak self] error in
                     if error != nil {
                         self?.removeHTTPStreamConnection(conn)

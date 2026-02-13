@@ -351,9 +351,9 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
         let bufferedSamples = 0;
         
         // Target buffer level (samples) - optimized for low latency
-        const TARGET_BUFFER_MS = 80;   // Tight: was 85ms
+        const TARGET_BUFFER_MS = 10;   // Ultra-low latency
         const INITIAL_PREBUFFER_MS = 5;   // Near-zero latency start
-        const REBUFFER_MS = 45;           // Safe recovery after underrun
+        const REBUFFER_MS = 10;           // Quick recovery after underrun
         let targetBufferSamples = 48000 * 2 * (TARGET_BUFFER_MS / 1000);
         let prebufferSamples = 48000 * 2 * (INITIAL_PREBUFFER_MS / 1000);
         let rebufferSamples = 48000 * 2 * (REBUFFER_MS / 1000);
@@ -366,6 +366,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
         let vizAnimFrame = null;
         let analyserNode = null;
         let vizFreqData = null;
+        let vizBarRanges = null;
         
         function initVisualizer() {
             vizBars = [];
@@ -375,13 +376,18 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
         }
         
         function animateVisualizer() {
-            if (analyserNode && vizFreqData) {
+            if (analyserNode && vizFreqData && vizBarRanges) {
                 analyserNode.getByteFrequencyData(vizFreqData);
-                // Map 32 frequency bins to 16 bars (2 bins per bar)
                 for (let i = 0; i < NUM_BARS; i++) {
-                    const bin1 = vizFreqData[i * 2] || 0;
-                    const bin2 = vizFreqData[i * 2 + 1] || 0;
-                    const avg = (bin1 + bin2) / 2;
+                    const range = vizBarRanges[i];
+                    let sum = 0;
+                    const count = range.high - range.low + 1;
+                    for (let bin = range.low; bin <= range.high; bin++) {
+                        sum += vizFreqData[bin];
+                    }
+                    let avg = sum / count;
+                    // Boost higher frequencies to compensate for natural energy rolloff
+                    avg = Math.min(255, avg * range.boost);
                     const height = Math.max(6, Math.min(110, (avg / 255) * 110));
                     if (vizBars[i]) {
                         vizBars[i].style.height = height + 'px';
@@ -497,14 +503,29 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
 
                 // Create analyser node for visualizer (FFT on live audio)
                 analyserNode = audioContext.createAnalyser();
-                analyserNode.fftSize = 64;  // 32 frequency bins
-                analyserNode.smoothingTimeConstant = 0.7;
+                analyserNode.fftSize = 256;  // 128 frequency bins
+                analyserNode.smoothingTimeConstant = 0.65;
                 vizFreqData = new Uint8Array(analyserNode.frequencyBinCount);
                 analyserNode.connect(gainNode);
-                debugLog('Analyser node created (fftSize: 64, bins: ' + analyserNode.frequencyBinCount + ')');
+
+                // Precompute logarithmic frequency-to-bar mapping
+                const binCount = analyserNode.frequencyBinCount;
+                const nyquist = audioContext.sampleRate / 2;
+                const minFreq = 60;
+                const maxFreq = Math.min(16000, nyquist);
+                vizBarRanges = [];
+                for (let i = 0; i < NUM_BARS; i++) {
+                    const lowFreq = minFreq * Math.pow(maxFreq / minFreq, i / NUM_BARS);
+                    const highFreq = minFreq * Math.pow(maxFreq / minFreq, (i + 1) / NUM_BARS);
+                    const lowBin = Math.max(0, Math.round(lowFreq / nyquist * binCount));
+                    const highBin = Math.min(binCount - 1, Math.max(lowBin, Math.round(highFreq / nyquist * binCount)));
+                    const boost = 1.0 + (i / (NUM_BARS - 1)) * 2.0;
+                    vizBarRanges.push({ low: lowBin, high: highBin, boost: boost });
+                }
+                debugLog('Analyser node created (fftSize: 256, bins: ' + binCount + ', bars: ' + NUM_BARS + ' log-mapped)');
 
                 // Create script processor for audio output (smaller buffer = lower latency)
-                scriptNode = audioContext.createScriptProcessor(512, 0, 2);
+                scriptNode = audioContext.createScriptProcessor(256, 0, 2);
                 scriptNode.onaudioprocess = processAudio;
                 scriptNode.connect(analyserNode);
                 debugLog('Script processor created (buffer: 512 frames, ~11ms)');
@@ -576,6 +597,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
 
             analyserNode = null;
             vizFreqData = null;
+            vizBarRanges = null;
             mediaStreamDest = null;
             
             isPlaying = false;
@@ -692,20 +714,15 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
                     const elapsed = Date.now() - startTime;
                     debugLog('❌ CLOSED after ' + elapsed + 'ms - code: ' + event.code + ', wasClean: ' + event.wasClean, 'warn');
                     document.getElementById('wsStatus').textContent = 'Disconnected';
-                    
+
                     if (isPlaying) {
                         reconnectAttempts++;
-                        if (reconnectAttempts <= 2) {
-                            debugLog('🔄 Reconnect ' + reconnectAttempts + '/2...', 'info');
-                            document.getElementById('reconnectOverlay').classList.add('visible');
-                            updateStatus('connecting', 'Reconnecting...');
-                            setTimeout(connectWebSocket, 1000);
-                        } else {
-                            debugLog('💀 No connection found', 'warn');
-                            document.getElementById('reconnectOverlay').classList.remove('visible');
-                            updateSubtitle(false, 'No connection found. Please check computer.');
-                            stopAudio();
-                        }
+                        // Backoff: 1s, 1s, 2s, 3s, then cap at 5s
+                        const delay = reconnectAttempts <= 2 ? 1000 : Math.min(5000, reconnectAttempts * 1000);
+                        debugLog('🔄 Reconnect #' + reconnectAttempts + ' in ' + delay + 'ms...', 'info');
+                        document.getElementById('reconnectOverlay').classList.add('visible');
+                        updateStatus('connecting', 'Reconnecting...');
+                        setTimeout(connectWebSocket, delay);
                     }
                 };
                 
@@ -768,19 +785,24 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
                 document.getElementById('reconnectOverlay').classList.remove('visible');
                 lastPacketTime = Date.now();
                 
-                // Watchdog: detect if stream goes stale (no data for 2 seconds)
+                // Watchdog: only act when stream is truly dead (long timeout)
+                // Brief WiFi pauses are absorbed by the audio buffer — don't overreact
                 httpWatchdog = setInterval(() => {
+                    if (!isPlaying) return;
                     const staleDuration = Date.now() - lastPacketTime;
-                    
-                    // Show spinner immediately when stale (after 1 second of no data)
-                    if (isPlaying && staleDuration > 1000) {
+                    const bufferMs = Math.round((bufferedSamples / 2) / outputRate * 1000);
+
+                    // Show spinner only when buffer is actually running dry
+                    if (isPrebuffering && staleDuration > 500) {
                         document.getElementById('reconnectOverlay').classList.add('visible');
                         updateStatus('connecting', 'Reconnecting...');
+                    } else if (!isPrebuffering) {
+                        document.getElementById('reconnectOverlay').classList.remove('visible');
                     }
-                    
-                    // After 2 seconds of no data, trigger reconnect
-                    if (isPlaying && staleDuration > 2000) {
-                        debugLog('⚠️ Stream stale - no data for 2s', 'warn');
+
+                    // Only kill connection after 8s of no data — server is truly gone
+                    if (staleDuration > 8000) {
+                        debugLog('⚠️ Stream dead - no data for 8s', 'warn');
                         clearInterval(httpWatchdog);
                         httpWatchdog = null;
                         if (httpStreamController) {
@@ -846,20 +868,15 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
                 clearInterval(httpWatchdog);
                 httpWatchdog = null;
             }
-            
+
             if (isPlaying) {
                 reconnectAttempts++;
-                if (reconnectAttempts <= 2) {
-                    debugLog('🔄 Reconnect ' + reconnectAttempts + '/2...', 'info');
-                    document.getElementById('reconnectOverlay').classList.add('visible');
-                    updateStatus('connecting', 'Reconnecting...');
-                    setTimeout(connectHTTPStream, 1000);
-                } else {
-                    debugLog('💀 No connection found', 'warn');
-                    document.getElementById('reconnectOverlay').classList.remove('visible');
-                    updateSubtitle(false, 'No connection found. Please check computer.');
-                    stopAudio();
-                }
+                // Backoff: 1s, 1s, 2s, 3s, then cap at 5s
+                const delay = reconnectAttempts <= 2 ? 1000 : Math.min(5000, reconnectAttempts * 1000);
+                debugLog('🔄 Reconnect #' + reconnectAttempts + ' in ' + delay + 'ms...', 'info');
+                document.getElementById('reconnectOverlay').classList.add('visible');
+                updateStatus('connecting', 'Reconnecting...');
+                setTimeout(connectHTTPStream, delay);
             }
         }
         
