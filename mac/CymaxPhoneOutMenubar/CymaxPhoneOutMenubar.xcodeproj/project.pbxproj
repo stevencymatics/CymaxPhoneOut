@@ -1,0 +1,397 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		D10000001000000000000001 /* CymaxPhoneOutMenubarApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000001000000000000001 /* CymaxPhoneOutMenubarApp.swift */; };
+		D10000001000000000000002 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000001000000000000002 /* AppState.swift */; };
+		D10000001000000000000003 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000001000000000000003 /* MenuBarView.swift */; };
+		D10000001000000000000004 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000001000000000000004 /* SettingsView.swift */; };
+		D10000001000000000000005 /* BonjourBrowser.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000001000000000000005 /* BonjourBrowser.swift */; };
+		D10000001000000000000006 /* ControlChannelClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000001000000000000006 /* ControlChannelClient.swift */; };
+		D10000001000000000000007 /* DriverCommunication.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000001000000000000007 /* DriverCommunication.swift */; };
+		D10000001000000000000008 /* UDPAudioReceiver.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000001000000000000008 /* UDPAudioReceiver.swift */; };
+		D10000001000000000000009 /* WebSocketServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000001000000000000009 /* WebSocketServer.swift */; };
+		D10000001000000000000011 /* HTTPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000001000000000000011 /* HTTPServer.swift */; };
+		D10000001000000000000012 /* QRCodeGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000001000000000000012 /* QRCodeGenerator.swift */; };
+		D10000001000000000000013 /* WebPlayerHTML.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000001000000000000013 /* WebPlayerHTML.swift */; };
+		D10000001000000000000014 /* SystemAudioCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000001000000000000014 /* SystemAudioCapture.swift */; };
+		D10000001000000000000015 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D20000001000000000000015 /* Assets.xcassets */; };
+		D10000001000000000000016 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000001000000000000016 /* OnboardingView.swift */; };
+		D10000001000000000000017 /* SubscriptionConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000001000000000000017 /* SubscriptionConfig.swift */; };
+		D10000001000000000000018 /* SubscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000001000000000000018 /* SubscriptionService.swift */; };
+		D10000001000000000000019 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000001000000000000019 /* LoginView.swift */; };
+		D10000001000000000000020 /* SubscriptionInactiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000001000000000000020 /* SubscriptionInactiveView.swift */; };
+		D10000001000000000000021 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000001000000000000021 /* KeychainHelper.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		D20000001000000000000001 /* CymaxPhoneOutMenubarApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CymaxPhoneOutMenubarApp.swift; sourceTree = "<group>"; };
+		D20000001000000000000002 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		D20000001000000000000003 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
+		D20000001000000000000004 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		D20000001000000000000005 /* BonjourBrowser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BonjourBrowser.swift; sourceTree = "<group>"; };
+		D20000001000000000000006 /* ControlChannelClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlChannelClient.swift; sourceTree = "<group>"; };
+		D20000001000000000000007 /* DriverCommunication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverCommunication.swift; sourceTree = "<group>"; };
+		D20000001000000000000008 /* UDPAudioReceiver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UDPAudioReceiver.swift; sourceTree = "<group>"; };
+		D20000001000000000000009 /* WebSocketServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketServer.swift; sourceTree = "<group>"; };
+		D20000001000000000000010 /* CymaxPhoneOutMenubar.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CymaxPhoneOutMenubar.entitlements; sourceTree = "<group>"; };
+		D20000001000000000000011 /* HTTPServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPServer.swift; sourceTree = "<group>"; };
+		D20000001000000000000012 /* QRCodeGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRCodeGenerator.swift; sourceTree = "<group>"; };
+		D20000001000000000000013 /* WebPlayerHTML.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebPlayerHTML.swift; sourceTree = "<group>"; };
+		D20000001000000000000014 /* SystemAudioCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioCapture.swift; sourceTree = "<group>"; };
+		D20000001000000000000015 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		D20000001000000000000016 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		D20000001000000000000017 /* SubscriptionConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionConfig.swift; sourceTree = "<group>"; };
+		D20000001000000000000018 /* SubscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionService.swift; sourceTree = "<group>"; };
+		D20000001000000000000019 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		D20000001000000000000020 /* SubscriptionInactiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionInactiveView.swift; sourceTree = "<group>"; };
+		D20000001000000000000021 /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
+		D20000001000000000000099 /* CymaxPhoneOutMenubar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CymaxPhoneOutMenubar.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		D30000001000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXResourcesBuildPhase section */
+		D30000001000000000000002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D10000001000000000000015 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXGroup section */
+		D40000001000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				D40000001000000000000002 /* CymaxPhoneOutMenubar */,
+				D40000001000000000000004 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		D40000001000000000000002 /* CymaxPhoneOutMenubar */ = {
+			isa = PBXGroup;
+			children = (
+				D20000001000000000000001 /* CymaxPhoneOutMenubarApp.swift */,
+				D20000001000000000000002 /* AppState.swift */,
+				D20000001000000000000003 /* MenuBarView.swift */,
+				D20000001000000000000004 /* SettingsView.swift */,
+				D20000001000000000000005 /* BonjourBrowser.swift */,
+				D20000001000000000000006 /* ControlChannelClient.swift */,
+				D20000001000000000000007 /* DriverCommunication.swift */,
+				D20000001000000000000008 /* UDPAudioReceiver.swift */,
+				D20000001000000000000009 /* WebSocketServer.swift */,
+				D20000001000000000000011 /* HTTPServer.swift */,
+				D20000001000000000000012 /* QRCodeGenerator.swift */,
+				D20000001000000000000013 /* WebPlayerHTML.swift */,
+				D20000001000000000000014 /* SystemAudioCapture.swift */,
+				D20000001000000000000016 /* OnboardingView.swift */,
+				D20000001000000000000017 /* SubscriptionConfig.swift */,
+				D20000001000000000000018 /* SubscriptionService.swift */,
+				D20000001000000000000019 /* LoginView.swift */,
+				D20000001000000000000020 /* SubscriptionInactiveView.swift */,
+				D20000001000000000000021 /* KeychainHelper.swift */,
+				D20000001000000000000015 /* Assets.xcassets */,
+				D20000001000000000000010 /* CymaxPhoneOutMenubar.entitlements */,
+			);
+			path = CymaxPhoneOutMenubar;
+			sourceTree = "<group>";
+		};
+		D40000001000000000000004 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				D20000001000000000000099 /* CymaxPhoneOutMenubar.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		D50000001000000000000001 /* CymaxPhoneOutMenubar */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D70000001000000000000001 /* Build configuration list for PBXNativeTarget "CymaxPhoneOutMenubar" */;
+			buildPhases = (
+				D60000001000000000000001 /* Sources */,
+				D30000001000000000000001 /* Frameworks */,
+				D30000001000000000000002 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CymaxPhoneOutMenubar;
+			productName = CymaxPhoneOutMenubar;
+			productReference = D20000001000000000000099 /* CymaxPhoneOutMenubar.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		D00000001000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					D50000001000000000000001 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = D70000001000000000000002 /* Build configuration list for PBXProject "CymaxPhoneOutMenubar" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = D40000001000000000000001;
+			productRefGroup = D40000001000000000000004 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				D50000001000000000000001 /* CymaxPhoneOutMenubar */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		D60000001000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D10000001000000000000001 /* CymaxPhoneOutMenubarApp.swift in Sources */,
+				D10000001000000000000002 /* AppState.swift in Sources */,
+				D10000001000000000000003 /* MenuBarView.swift in Sources */,
+				D10000001000000000000004 /* SettingsView.swift in Sources */,
+				D10000001000000000000005 /* BonjourBrowser.swift in Sources */,
+				D10000001000000000000006 /* ControlChannelClient.swift in Sources */,
+				D10000001000000000000007 /* DriverCommunication.swift in Sources */,
+				D10000001000000000000008 /* UDPAudioReceiver.swift in Sources */,
+				D10000001000000000000009 /* WebSocketServer.swift in Sources */,
+				D10000001000000000000011 /* HTTPServer.swift in Sources */,
+				D10000001000000000000012 /* QRCodeGenerator.swift in Sources */,
+				D10000001000000000000013 /* WebPlayerHTML.swift in Sources */,
+				D10000001000000000000014 /* SystemAudioCapture.swift in Sources */,
+				D10000001000000000000016 /* OnboardingView.swift in Sources */,
+				D10000001000000000000017 /* SubscriptionConfig.swift in Sources */,
+				D10000001000000000000018 /* SubscriptionService.swift in Sources */,
+				D10000001000000000000019 /* LoginView.swift in Sources */,
+				D10000001000000000000020 /* SubscriptionInactiveView.swift in Sources */,
+				D10000001000000000000021 /* KeychainHelper.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		D80000001000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		D80000001000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+			};
+			name = Release;
+		};
+		D80000001000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = CymaxPhoneOutMenubar/CymaxPhoneOutMenubar.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2T2WR8NY68;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Cymatics Mix Link";
+				INFOPLIST_KEY_CFBundleName = "Cymatics Mix Link";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2024 Cymatics. All rights reserved.";
+				INFOPLIST_KEY_NSScreenCaptureUsageDescription = "Cymatics Mix Link needs Screen Recording permission to capture system audio and stream it to your phone.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cymatics.mixlink;
+				PRODUCT_NAME = "Cymatics Mix Link";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		D80000001000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = CymaxPhoneOutMenubar/CymaxPhoneOutMenubar.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2T2WR8NY68;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Cymatics Mix Link";
+				INFOPLIST_KEY_CFBundleName = "Cymatics Mix Link";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2024 Cymatics. All rights reserved.";
+				INFOPLIST_KEY_NSScreenCaptureUsageDescription = "Cymatics Mix Link needs Screen Recording permission to capture system audio and stream it to your phone.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.cymatics.mixlink;
+				PRODUCT_NAME = "Cymatics Mix Link";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		D70000001000000000000001 /* Build configuration list for PBXNativeTarget "CymaxPhoneOutMenubar" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D80000001000000000000003 /* Debug */,
+				D80000001000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D70000001000000000000002 /* Build configuration list for PBXProject "CymaxPhoneOutMenubar" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D80000001000000000000001 /* Debug */,
+				D80000001000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = D00000001000000000000001 /* Project object */;
+}
