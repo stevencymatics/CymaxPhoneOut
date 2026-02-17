@@ -57,7 +57,8 @@ actor SubscriptionService {
 
     /// Full check: login via Shopify, then verify access via Recharge subscription OR Shopify one-time purchase.
     /// Returns `true` when the customer has either an active subscription or a completed one-time purchase.
-    func checkSubscription(email: String, password: String) async throws -> Bool {
+    func checkSubscription(email rawEmail: String, password: String) async throws -> Bool {
+        let email = rawEmail.trimmingCharacters(in: .whitespacesAndNewlines)
         log("Starting subscription check for email: \(email)")
 
         // Step 1: Verify Shopify credentials and get access token

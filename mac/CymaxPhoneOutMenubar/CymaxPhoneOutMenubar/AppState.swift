@@ -63,6 +63,9 @@ class AppState: ObservableObject {
     private var savedEmail: String?
     private var savedPassword: String?
 
+    // Grace period — UserDefaults key for the last successful verification timestamp
+    private static let lastVerifiedKey = "com.cymatics.mixlink.lastVerifiedAt"
+
     // Server state
     @Published var isServerRunning: Bool = false
     @Published var webClientsConnected: Int = 0
@@ -113,7 +116,16 @@ class AppState: ObservableObject {
             log("Found saved credentials for \(creds.email) — auto-logging in")
             savedEmail = creds.email
             savedPassword = creds.password
-            subscriptionStatus = .active
+
+            // If we have a valid grace period or previous success, show app immediately
+            // and verify in background. Otherwise show checking state.
+            if isWithinGracePeriod() {
+                subscriptionStatus = .active
+                log("Within grace period — showing app immediately")
+            } else {
+                subscriptionStatus = .active
+                log("No grace period — showing app while verifying in background")
+            }
             backgroundVerify(email: creds.email, password: creds.password)
         }
     }
@@ -481,9 +493,46 @@ class AppState: ObservableObject {
         qrCodeImage = QRCodeGenerator.generate(url: url, size: 200)
     }
     
+    // MARK: - Grace Period Helpers
+
+    /// Record a successful verification timestamp.
+    private func markVerificationSuccess() {
+        let now = Date()
+        UserDefaults.standard.set(now.timeIntervalSince1970, forKey: Self.lastVerifiedKey)
+        log("Grace period: recorded successful verification at \(now)", level: .info)
+    }
+
+    /// Returns true if we are still within the grace period from the last successful verification.
+    private func isWithinGracePeriod() -> Bool {
+        let lastVerified = UserDefaults.standard.double(forKey: Self.lastVerifiedKey)
+        guard lastVerified > 0 else {
+            log("Grace period: no previous verification on record", level: .info)
+            return false
+        }
+        let elapsed = Date().timeIntervalSince1970 - lastVerified
+        let grace = SubscriptionConfig.effectiveGracePeriod
+        let remaining = grace - elapsed
+        if remaining > 0 {
+            let hours = Int(remaining) / 3600
+            let minutes = (Int(remaining) % 3600) / 60
+            log("Grace period: \(hours)h \(minutes)m remaining (elapsed: \(Int(elapsed))s of \(Int(grace))s)", level: .info)
+            return true
+        } else {
+            log("Grace period: expired (\(Int(elapsed))s elapsed, grace was \(Int(grace))s)", level: .warning)
+            return false
+        }
+    }
+
+    /// Clear the grace period timestamp.
+    private func clearGracePeriod() {
+        UserDefaults.standard.removeObject(forKey: Self.lastVerifiedKey)
+    }
+
     // MARK: - Subscription
 
     /// Authenticate with Shopify and check Recharge subscription status.
+    /// Credentials are always saved after a valid Shopify login (correct email + password),
+    /// regardless of subscription status. This way the user only types their password once.
     func login(email: String, password: String) {
         subscriptionStatus = .checking
         subscriptionError = nil
@@ -495,18 +544,39 @@ class AppState: ObservableObject {
                     password: password
                 )
                 await MainActor.run {
+                    // Always save credentials after successful Shopify authentication
+                    self.savedEmail = email
+                    self.savedPassword = password
+                    KeychainHelper.saveCredentials(email: email, password: password)
+
                     if isActive {
                         self.subscriptionStatus = .active
                         self.subscriptionError = nil
-                        self.savedEmail = email
-                        self.savedPassword = password
-                        KeychainHelper.saveCredentials(email: email, password: password)
+                        self.markVerificationSuccess()
                         self.log("Subscription verified — access granted, credentials saved", level: .info)
                     } else {
                         self.subscriptionStatus = .inactive
                         self.subscriptionError = nil
-                        KeychainHelper.clearCredentials()
-                        self.log("No active subscription for this product", level: .warning)
+                        self.log("No active subscription — credentials saved for next attempt", level: .warning)
+                    }
+                }
+            } catch let error as SubscriptionServiceError {
+                await MainActor.run {
+                    switch error {
+                    case .invalidCredentials:
+                        // Bad email/password — don't save credentials
+                        self.subscriptionStatus = .loginFailed(error.localizedDescription)
+                        self.subscriptionError = error.localizedDescription
+                        self.log("Invalid credentials — not saving", level: .error)
+                    default:
+                        // Network or other errors — save credentials so they can retry on relaunch
+                        self.savedEmail = email
+                        self.savedPassword = password
+                        KeychainHelper.saveCredentials(email: email, password: password)
+                        let message = error.localizedDescription
+                        self.subscriptionStatus = .loginFailed(message)
+                        self.subscriptionError = message
+                        self.log("Login check failed: \(message) — credentials saved for retry", level: .error)
                     }
                 }
             } catch {
@@ -514,14 +584,15 @@ class AppState: ObservableObject {
                     let message = error.localizedDescription
                     self.subscriptionStatus = .loginFailed(message)
                     self.subscriptionError = message
-                    self.log("Login/subscription check failed: \(message)", level: .error)
+                    self.log("Login check failed: \(message)", level: .error)
                 }
             }
         }
     }
 
     /// Run subscription verification silently in the background (used for auto-login).
-    /// The app stays usable while this runs. Only revokes access on explicit failure.
+    /// The app stays usable while this runs. If subscription is found inactive,
+    /// the grace period is checked before revoking access.
     private func backgroundVerify(email: String, password: String) {
         isBackgroundVerifying = true
         log("Starting background verification for \(email)", level: .info)
@@ -535,11 +606,18 @@ class AppState: ObservableObject {
                 await MainActor.run {
                     self.isBackgroundVerifying = false
                     if isActive {
+                        self.markVerificationSuccess()
                         self.log("Background verification passed", level: .info)
                     } else {
-                        self.log("Background verification: subscription no longer active", level: .warning)
-                        self.subscriptionStatus = .inactive
-                        KeychainHelper.clearCredentials()
+                        // Subscription inactive — check grace period
+                        if self.isWithinGracePeriod() {
+                            self.log("Background verification: subscription inactive but within grace period — keeping access", level: .warning)
+                        } else {
+                            self.log("Background verification: subscription inactive and grace period expired — revoking access", level: .warning)
+                            self.subscriptionStatus = .inactive
+                            KeychainHelper.clearCredentials()
+                            self.clearGracePeriod()
+                        }
                     }
                 }
             } catch let error as SubscriptionServiceError {
@@ -551,15 +629,16 @@ class AppState: ObservableObject {
                         self.subscriptionStatus = .notChecked
                         self.subscriptionError = "Your session has expired. Please sign in again."
                         KeychainHelper.clearCredentials()
+                        self.clearGracePeriod()
                     default:
-                        // Network errors or transient issues — keep user logged in (grace period)
-                        self.log("Background verification failed (non-critical): \(error.localizedDescription) — keeping access", level: .warning)
+                        // Network errors or transient issues — keep user logged in
+                        self.log("Background verification failed (network/transient): \(error.localizedDescription) — keeping access", level: .warning)
                     }
                 }
             } catch {
                 await MainActor.run {
                     self.isBackgroundVerifying = false
-                    // Unknown errors — keep user logged in (grace period)
+                    // Unknown errors — keep user logged in
                     self.log("Background verification error (non-critical): \(error.localizedDescription) — keeping access", level: .warning)
                 }
             }
@@ -573,7 +652,8 @@ class AppState: ObservableObject {
         savedEmail = nil
         savedPassword = nil
         KeychainHelper.clearCredentials()
-        log("User signed out — credentials cleared", level: .info)
+        clearGracePeriod()
+        log("User signed out — credentials and grace period cleared", level: .info)
     }
 
     // MARK: - Logging

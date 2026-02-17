@@ -9,8 +9,8 @@ import SwiftUI
 
 struct LoginView: View {
     @EnvironmentObject var appState: AppState
-    @State private var email: String = ""
-    @State private var password: String = ""
+    @State private var email: String = KeychainHelper.loadCredentials()?.email ?? ""
+    @State private var password: String = KeychainHelper.loadCredentials()?.password ?? ""
     @State private var hoveringTrafficLights = false
 
     var body: some View {
@@ -41,40 +41,60 @@ struct LoginView: View {
                     .foregroundColor(.white)
             }
 
-            Spacer().frame(height: 28)
+            Spacer().frame(height: 20)
 
             // Form
             VStack(spacing: 14) {
-                Text("Sign in to continue")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.gray)
-
                 // Email
-                TextField("Email", text: $email)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13))
-                    .foregroundColor(.white)
-                    .padding(10)
-                    .background(Color.white.opacity(0.07))
-                    .cornerRadius(8)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.white.opacity(0.12), lineWidth: 1)
-                    )
-                    .disableAutocorrection(true)
+                ZStack(alignment: .leading) {
+                    if email.isEmpty {
+                        Text("Email")
+                            .font(.system(size: 13))
+                            .foregroundColor(Color.white.opacity(0.5))
+                            .padding(.leading, 10)
+                    }
+                    TextField("", text: $email)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 13))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                        .padding(10)
+                        .disableAutocorrection(true)
+                        .onSubmit { }
+                }
+                .background(Color.white.opacity(0.15))
+                .cornerRadius(8)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.white.opacity(0.25), lineWidth: 1)
+                )
 
                 // Password
-                SecureField("Password", text: $password)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13))
-                    .foregroundColor(.white)
-                    .padding(10)
-                    .background(Color.white.opacity(0.07))
-                    .cornerRadius(8)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.white.opacity(0.12), lineWidth: 1)
-                    )
+                ZStack(alignment: .leading) {
+                    if password.isEmpty {
+                        Text("Password")
+                            .font(.system(size: 13))
+                            .foregroundColor(Color.white.opacity(0.5))
+                            .padding(.leading, 10)
+                    }
+                    SecureField("", text: $password)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 13))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                        .padding(10)
+                        .onSubmit {
+                            if !email.isEmpty && !password.isEmpty {
+                                appState.login(email: email, password: password)
+                            }
+                        }
+                }
+                .background(Color.white.opacity(0.15))
+                .cornerRadius(8)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.white.opacity(0.25), lineWidth: 1)
+                )
 
                 // Error message
                 if let errorMessage = appState.subscriptionError {

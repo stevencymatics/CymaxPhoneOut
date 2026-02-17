@@ -42,6 +42,23 @@ struct SubscriptionConfig {
         "42152527265877"
     ]
 
+    // MARK: - Grace Period
+
+    /// How long (in seconds) a user can keep using the app after their subscription
+    /// is found to be inactive. This covers scenarios like being offline on a plane.
+    /// Default: 48 hours (172800 seconds).
+    static let gracePeriodSeconds: TimeInterval = 48 * 60 * 60
+
+    /// Set this to a shorter value (e.g. 120 for 2 minutes) to test the grace period.
+    /// Set to `nil` to use the real `gracePeriodSeconds` value above.
+    /// IMPORTANT: Set back to `nil` before shipping!
+    static let debugGracePeriodOverride: TimeInterval? = 120  // 2 minutes for testing
+
+    /// The effective grace period (uses debug override if set).
+    static var effectiveGracePeriod: TimeInterval {
+        return debugGracePeriodOverride ?? gracePeriodSeconds
+    }
+
     // MARK: - UI
 
     /// URL opened when the user taps "View Plans" on the subscription-inactive screen
