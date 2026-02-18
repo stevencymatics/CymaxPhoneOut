@@ -24,21 +24,47 @@ struct CymaxPhoneOutMenubarApp: App {
     }
 }
 
-/// Menubar icon with optional cyan activity indicator
+/// Pre-rendered waveform menubar icon (Apple TV audio-picker style, center-aligned bars)
+private func makeMenuBarIcon(slashed: Bool) -> NSImage {
+    let barHeights: [CGFloat] = [0.35, 0.7, 1.0, 0.7, 0.35]
+    let barWidth: CGFloat = 2.0
+    let gap: CGFloat = 2.0
+    let maxH: CGFloat = 16.0
+    let totalW = ceil(CGFloat(barHeights.count) * barWidth + CGFloat(barHeights.count - 1) * gap)
+
+    let img = NSImage(size: NSSize(width: totalW, height: maxH))
+    img.lockFocus()
+    NSColor.black.setFill()
+    for i in 0..<barHeights.count {
+        let h = max(4, maxH * barHeights[i])
+        let x = CGFloat(i) * (barWidth + gap)
+        let y = (maxH - h) / 2  // center-aligned vertically
+        let rect = NSRect(x: x, y: y, width: barWidth, height: h)
+        NSBezierPath(roundedRect: rect, xRadius: 1, yRadius: 1).fill()
+    }
+    if slashed {
+        NSColor.black.setStroke()
+        let slash = NSBezierPath()
+        slash.move(to: NSPoint(x: totalW * 0.85, y: maxH * 0.9))
+        slash.line(to: NSPoint(x: totalW * 0.15, y: maxH * 0.1))
+        slash.lineWidth = 2.0
+        slash.lineCapStyle = .round
+        slash.stroke()
+    }
+    img.unlockFocus()
+    img.isTemplate = true
+    return img
+}
+
+private let menuBarIconActive = makeMenuBarIcon(slashed: false)
+private let menuBarIconInactive = makeMenuBarIcon(slashed: true)
+
+/// Menubar icon — wave bars when active, slashed wave bars when inactive
 struct MenuBarLabel: View {
     let isActive: Bool
 
     var body: some View {
-        Image("CymaticsLogo")
-            .renderingMode(.template)
-            .overlay(alignment: .bottomTrailing) {
-                if isActive {
-                    Circle()
-                        .fill(Color(red: 0, green: 212/255, blue: 1))
-                        .frame(width: 6, height: 6)
-                        .offset(x: 2, y: 2)
-                }
-            }
+        Image(nsImage: isActive ? menuBarIconActive : menuBarIconInactive)
     }
 }
 

@@ -13,6 +13,72 @@ extension Color {
     static let mixLinkTeal = Color(red: 0, green: 1, blue: 212/255)
 }
 
+/// Pre-rendered hamburger icons (dim for default, bright for hover)
+private func makeHamburgerImage(alpha: CGFloat) -> NSImage {
+    let size: CGFloat = 18
+    let barW: CGFloat = 14
+    let barH: CGFloat = 2.25
+    let cr: CGFloat = 1.1
+    let xOff = (size - barW) / 2
+
+    let img = NSImage(size: NSSize(width: size, height: size))
+    img.lockFocus()
+    NSColor.white.withAlphaComponent(alpha).setFill()
+    for yTop in [3.375, 7.875, 12.375] as [CGFloat] {
+        let yBottom = size - yTop - barH
+        let rect = NSRect(x: xOff, y: yBottom, width: barW, height: barH)
+        NSBezierPath(roundedRect: rect, xRadius: cr, yRadius: cr).fill()
+    }
+    img.unlockFocus()
+    return img
+}
+private let hamburgerDim = makeHamburgerImage(alpha: 0.4)
+private let hamburgerBright = makeHamburgerImage(alpha: 0.85)
+
+/// Hamburger menu shown in top-right corner of all screens
+struct HamburgerMenuButton: View {
+    @EnvironmentObject var appState: AppState
+    @State private var isHovering = false
+
+    var body: some View {
+        Menu {
+            Button(action: {
+                if appState.isServerRunning {
+                    appState.stopServer()
+                }
+                appState.signOut()
+            }) {
+                Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+            }
+
+            Button(action: {
+                if let url = URL(string: "mailto:\(SubscriptionConfig.supportEmail)") {
+                    NSWorkspace.shared.open(url)
+                }
+            }) {
+                Label("Help", systemImage: "questionmark.circle")
+            }
+
+            Divider()
+
+            Button(action: {
+                NSApplication.shared.terminate(nil)
+            }) {
+                Label("Quit", systemImage: "power")
+            }
+        } label: {
+            Image(nsImage: isHovering ? hamburgerBright : hamburgerDim)
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .onHover { isHovering = $0 }
+        .padding(.top, 2)
+    }
+}
+
 struct MenuBarView: View {
     @EnvironmentObject var appState: AppState
     @State private var hoveringTrafficLights = false
@@ -46,9 +112,7 @@ struct MenuBarView: View {
                 HStack {
                     trafficLightButtons
                     Spacer()
-                    if !appState.needsPermission {
-                        statusIndicator
-                    }
+                    HamburgerMenuButton()
                 }
                 .padding(.horizontal, 12)
                 .padding(.top, 6)
@@ -96,6 +160,7 @@ struct MenuBarView: View {
             HStack {
                 trafficLightButtons
                 Spacer()
+                HamburgerMenuButton()
             }
             .padding(.horizontal, 12)
             .padding(.top, 10)
@@ -267,19 +332,6 @@ struct MenuBarView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private var statusIndicator: some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(appState.isServerRunning ? Color.mixLinkCyan : Color.gray.opacity(0.5))
-                .frame(width: 8, height: 8)
-                .shadow(color: appState.isServerRunning ? Color.mixLinkCyan.opacity(0.6) : .clear, radius: 4)
-
-            Text(appState.isServerRunning ? "Live" : "Off")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(appState.isServerRunning ? .mixLinkCyan : .gray)
-        }
-    }
-    
     // MARK: - Connection View
     
     private var connectionView: some View {
@@ -483,18 +535,6 @@ struct MenuBarView: View {
             }
             .buttonStyle(.plain)
 
-            Button(action: {
-                if appState.isServerRunning {
-                    appState.stopServer()
-                }
-                appState.signOut()
-            }) {
-                Text("Sign Out")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.gray)
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 8)
         }
     }
     

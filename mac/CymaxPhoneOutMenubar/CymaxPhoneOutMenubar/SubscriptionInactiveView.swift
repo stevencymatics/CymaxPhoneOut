@@ -14,10 +14,11 @@ struct SubscriptionInactiveView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Traffic light buttons
+            // Traffic light buttons + hamburger menu
             HStack {
                 trafficLightButtons
                 Spacer()
+                HamburgerMenuButton()
             }
             .padding(.horizontal, 12)
             .padding(.top, 8)
@@ -85,19 +86,6 @@ struct SubscriptionInactiveView: View {
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
 
-                // Sign out / try again
-                Button(action: {
-                    appState.signOut()
-                }) {
-                    Text("Sign Out")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.mixLinkCyan)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .background(Color.mixLinkCyan.opacity(0.1))
-                        .cornerRadius(8)
-                }
-                .buttonStyle(.plain)
             }
             .padding(.horizontal, 24)
 

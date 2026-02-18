@@ -16,10 +16,11 @@ struct OnboardingView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Traffic light buttons
+            // Traffic light buttons + hamburger menu
             HStack {
                 trafficLightButtons
                 Spacer()
+                HamburgerMenuButton()
             }
             .padding(.horizontal, 12)
             .padding(.top, 8)
