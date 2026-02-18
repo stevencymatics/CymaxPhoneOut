@@ -42,6 +42,8 @@ struct OnboardingView: View {
                     Circle()
                         .fill(i == currentPage ? Color.white.opacity(0.9) : Color.white.opacity(0.2))
                         .frame(width: 6, height: 6)
+                        .contentShape(Circle().scale(3))
+                        .onTapGesture { currentPage = i }
                 }
             }
             .padding(.top, 16)
@@ -222,9 +224,9 @@ struct OnboardingView: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 permissionStep(number: 1, text: "Click \"Open Settings\" below")
-                permissionStep(number: 2, text: "Find \"Screen & System Audio Recording\" and click +")
-                permissionStep(number: 3, text: "Select \"Cymatics Mix Link\"")
-                permissionStep(number: 4, text: "Enter your password if prompted")
+                permissionStep(number: 2, text: "Find the \"Cymatics Mix Link\" permission and switch it on")
+                permissionStep(number: 3, text: "Enter your password if prompted")
+                permissionStep(number: 4, text: "Ensure your computer and phone are on the same WiFi network or Hotspot")
             }
             .padding(12)
             .background(Color.white.opacity(0.04))

@@ -115,7 +115,7 @@ struct MenuBarView: View {
                     HamburgerMenuButton()
                 }
                 .padding(.horizontal, 12)
-                .padding(.top, 6)
+                .padding(.top, 8)
 
                 // Centered branding logo
                 headerView
@@ -163,106 +163,96 @@ struct MenuBarView: View {
                 HamburgerMenuButton()
             }
             .padding(.horizontal, 12)
-            .padding(.top, 10)
-            
-            // Permission content
-            VStack(spacing: 20) {
-                // Header
-                VStack(spacing: 8) {
-                    Image(systemName: "rectangle.inset.filled.and.person.filled")
-                        .font(.system(size: 36))
-                        .foregroundColor(.orange)
-                    
-                    Text("Permission Required")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(.white)
-                    
-                    Text("Cymatics Mix Link needs Screen Recording access to capture your Mac's audio")
-                        .font(.system(size: 11))
-                        .foregroundColor(.gray)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, 10)
-                }
-                
-                // Steps
-                VStack(alignment: .leading, spacing: 10) {
+            .padding(.top, 8)
+            .padding(.bottom, 8)
+
+            // Same style as onboarding page 3
+            VStack(spacing: 12) {
+                Image(systemName: "lock.shield.fill")
+                    .font(.system(size: 32))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.mixLinkCyan, .mixLinkTeal],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+
+                Text("Enable Audio Capture")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.white)
+
+                VStack(alignment: .leading, spacing: 6) {
                     permissionStep(number: 1, text: "Click \"Open Settings\" below")
-                    permissionStep(number: 2, text: "Find \"Screen & System Audio\" section and click +")
-                    permissionStep(number: 3, text: "Select \"Cymatics Mix Link\" from the list")
-                    permissionStep(number: 4, text: "Enter password if prompted")
-                    permissionStep(number: 5, text: "Ensure your phone and computer are on the same WiFi or Hotspot network")
+                    permissionStep(number: 2, text: "Find the \"Cymatics Mix Link\" permission and switch it on")
+                    permissionStep(number: 3, text: "Enter your password if prompted")
+                    permissionStep(number: 4, text: "Ensure your computer and phone are on the same WiFi network or Hotspot")
                 }
-                .padding(14)
-                .background(Color.white.opacity(0.05))
-                .cornerRadius(10)
-                
-                // Buttons
-                VStack(spacing: 10) {
-                    Button(action: { appState.openScreenRecordingSettings() }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "gear")
-                                .font(.system(size: 14))
-                            Text("Open Settings")
-                                .font(.system(size: 13, weight: .semibold))
-                        }
-                        .foregroundColor(.black)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(Color.orange)
-                        .cornerRadius(10)
-                    }
-                    .buttonStyle(.plain)
-                    
-                    Button(action: {
-                        // macOS requires app restart to pick up new TCC permissions
-                        restartApp()
-                    }) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 11))
-                            Text("I've enabled it - Restart App")
-                                .font(.system(size: 11, weight: .medium))
-                        }
-                        .foregroundColor(.orange)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(Color.orange.opacity(0.1))
-                        .cornerRadius(8)
-                    }
-                    .buttonStyle(.plain)
-                }
+                .padding(12)
+                .background(Color.white.opacity(0.04))
+                .cornerRadius(12)
             }
-            .padding(20)
-            .background(Color(red: 0.10, green: 0.10, blue: 0.10))
-            .cornerRadius(16)
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color.orange.opacity(0.3), lineWidth: 1)
-            )
-            .padding(.horizontal, 16)
-            .padding(.top, 20)
-            
-            Spacer()
+            .padding(.horizontal, 24)
+
+            Spacer().frame(height: 24)
+
+            // Buttons
+            VStack(spacing: 8) {
+                Button(action: { appState.openScreenRecordingSettings() }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "gear")
+                            .font(.system(size: 13))
+                        Text("Open Settings")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    .foregroundColor(.black)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(
+                        LinearGradient(
+                            colors: [.mixLinkCyan, .mixLinkTeal],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .cornerRadius(10)
+                }
+                .buttonStyle(.plain)
+
+                Button(action: { restartApp() }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 11))
+                        Text("I've enabled it — Restart")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .foregroundColor(.mixLinkCyan)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(Color.mixLinkCyan.opacity(0.1))
+                    .cornerRadius(8)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 16)
         }
     }
-    
+
     private func permissionStep(number: Int, text: String) -> some View {
         HStack(alignment: .center, spacing: 10) {
-            // Number circle
             ZStack {
                 Circle()
-                    .fill(Color.orange)
+                    .fill(Color.mixLinkCyan.opacity(0.15))
                     .frame(width: 20, height: 20)
                 Text("\(number)")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(.black)
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundColor(.mixLinkCyan)
             }
 
-            // Step text - allow wrapping
             Text(text)
                 .font(.system(size: 11))
-                .foregroundColor(.white.opacity(0.9))
+                .foregroundColor(.white.opacity(0.7))
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }

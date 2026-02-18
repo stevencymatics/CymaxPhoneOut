@@ -36,10 +36,10 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: #000;
             min-height: 100vh;
+            min-height: 100dvh;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
             color: #fff;
             padding: 10px;
             touch-action: manipulation;
@@ -48,17 +48,21 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
             user-select: none;
             overscroll-behavior: none;
         }
-        
+
         .container {
             text-align: center;
             max-width: 100%;
             width: 100%;
             padding: 0 10px;
-            margin-top: -40px;
+            padding-top: 12vh;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
-        
+
         .branding {
-            margin-bottom: 8px;
+            margin-bottom: 4px;
         }
         .branding svg {
             display: block;
@@ -77,10 +81,11 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
         
         .subtitle {
             color: #888;
-            margin-bottom: 35px;
+            margin-top: 32px;
+            margin-bottom: 0;
             font-size: 1.2rem;
         }
-        
+
         .play-button {
             width: 130px;
             height: 130px;
@@ -88,7 +93,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
             border: none;
             background: linear-gradient(135deg, #00d4ff 0%, #00ffd4 100%);
             cursor: pointer;
-            margin: 30px auto 35px;
+            margin: auto auto 35px;
             transition: all 0.2s;
             display: flex;
             align-items: center;

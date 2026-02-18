@@ -379,7 +379,19 @@ class AppState: ObservableObject {
     
     /// Open System Settings to Screen Recording permission pane
     func openScreenRecordingSettings() {
-        SystemAudioCapture.openSystemSettings()
+        // Bring app to foreground so the system permission dialog appears on top
+        NSApp.activate(ignoringOtherApps: true)
+
+        // Register the app in the Screen Recording permissions list so
+        // the user sees a toggle instead of having to manually click "+"
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            _ = SystemAudioCapture.requestPermission()
+        }
+
+        // Open Settings after a longer delay so the system dialog clears first
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            SystemAudioCapture.openSystemSettings()
+        }
         log("Opened System Settings - please grant permission", level: .info)
     }
     
