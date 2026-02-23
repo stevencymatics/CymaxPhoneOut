@@ -55,7 +55,14 @@ internal static class Program
             }
         };
 
-        // Run the application
+        // Verify license before launching the app
+        using var loginForm = new LoginForm();
+        var result = loginForm.ShowDialog();
+
+        if (result != DialogResult.OK || !loginForm.LoginSuccess)
+            return;
+
+        // License verified — run the application
         Application.Run(new TrayApplication());
     }
 }
