@@ -58,7 +58,8 @@ struct SubscriptionInactiveView: View {
 
                 // View Plans button
                 Button(action: {
-                    if let url = URL(string: SubscriptionConfig.viewPlansURL) {
+                    let urlString = appState.viewPlansUrl ?? SubscriptionConfig.viewPlansURL
+                    if let url = URL(string: urlString) {
                         NSWorkspace.shared.open(url)
                     }
                 }) {

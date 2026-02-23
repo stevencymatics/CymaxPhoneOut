@@ -3,44 +3,19 @@
 //  CymaxPhoneOutMenubar
 //
 //  Per-app subscription checker configuration.
-//  Replace the placeholder values below with your real credentials before building.
 //
 
 import Foundation
 
 struct SubscriptionConfig {
 
-    // MARK: - Shopify Storefront API
+    // MARK: - Cloudflare Worker (License Verification)
 
-    /// Storefront GraphQL endpoint
-    static let shopifyStorefrontURL = "https://cymatics-fm.myshopify.com/api/2024-01/graphql.json"
+    /// License verification endpoint — all credential and subscription checks go through this worker.
+    static let workerURL = "https://license-verification-worker.teamcymatics.workers.dev/verify-license"
 
-    /// Storefront public access token (used in X-Shopify-Storefront-Access-Token header)
-    static let shopifyStorefrontToken = "90e0936879c7680b4bbe4a4f3e8b843e"
-
-    // MARK: - Recharge API
-
-    /// Recharge REST API base URL
-    static let rechargeBaseURL = "https://api.rechargeapps.com"
-
-    /// Recharge API token (with read_customers and read_subscriptions scopes)
-    static let rechargeAPIToken = "sk_2x2_9597dbeaef75da7148e0539edf613f727119f7f75daacf5853917b7169de8ba6"
-
-    // MARK: - Product Entitlement (Subscriptions)
-
-    /// Shopify variant IDs for subscription products (checked via Recharge).
-    /// A user with an active Recharge subscription containing any of these variants is allowed in.
-    static let subscriptionVariantIDs: [String] = [
-        "42152113307733"
-    ]
-
-    // MARK: - Product Entitlement (One-Time Purchases)
-
-    /// Shopify variant IDs for one-time purchase products (checked via Shopify order history).
-    /// A user who has successfully ordered any of these variants is allowed in.
-    static let oneTimePurchaseVariantIDs: [String] = [
-        "42152527265877"
-    ]
+    /// Product slug sent to the worker so it knows which product to check.
+    static let productSlug = "mix-link"
 
     // MARK: - Grace Period
 
@@ -52,7 +27,7 @@ struct SubscriptionConfig {
     /// Set this to a shorter value (e.g. 120 for 2 minutes) to test the grace period.
     /// Set to `nil` to use the real `gracePeriodSeconds` value above.
     /// IMPORTANT: Set back to `nil` before shipping!
-    static let debugGracePeriodOverride: TimeInterval? = 120  // 2 minutes for testing
+    static let debugGracePeriodOverride: TimeInterval? = nil
 
     /// The effective grace period (uses debug override if set).
     static var effectiveGracePeriod: TimeInterval {
@@ -61,7 +36,8 @@ struct SubscriptionConfig {
 
     // MARK: - UI
 
-    /// URL opened when the user taps "View Plans" on the subscription-inactive screen
+    /// Default URL opened when the user taps "View Plans" on the subscription-inactive screen.
+    /// The worker may return a different URL in the `view_plans_url` field.
     static let viewPlansURL = "https://cymatics.fm/pages/mix-link"
 
     /// Support email shown on the inactive screen

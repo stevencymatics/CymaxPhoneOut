@@ -59,6 +59,7 @@ class AppState: ObservableObject {
     @Published var subscriptionStatus: SubscriptionStatus = .notChecked
     @Published var subscriptionError: String? = nil
     @Published var isBackgroundVerifying: Bool = false
+    @Published var viewPlansUrl: String? = nil
     private let subscriptionService = SubscriptionService()
     private var savedEmail: String?
     private var savedPassword: String?
@@ -542,53 +543,68 @@ class AppState: ObservableObject {
 
     // MARK: - Subscription
 
-    /// Authenticate with Shopify and check Recharge subscription status.
-    /// Credentials are always saved after a valid Shopify login (correct email + password),
-    /// regardless of subscription status. This way the user only types their password once.
+    /// Verify credentials and subscription status via the Cloudflare Worker.
+    /// Credentials are saved after any non-invalid-credentials response so the
+    /// user only types their password once.
     func login(email: String, password: String) {
         subscriptionStatus = .checking
         subscriptionError = nil
 
         Task {
             do {
-                let isActive = try await subscriptionService.checkSubscription(
+                let result = try await subscriptionService.verifyLicense(
                     email: email,
                     password: password
                 )
                 await MainActor.run {
-                    // Always save credentials after successful Shopify authentication
-                    self.savedEmail = email
-                    self.savedPassword = password
-                    KeychainHelper.saveCredentials(email: email, password: password)
-
-                    if isActive {
+                    if result.accessGranted {
+                        self.savedEmail = email
+                        self.savedPassword = password
+                        KeychainHelper.saveCredentials(email: email, password: password)
                         self.subscriptionStatus = .active
                         self.subscriptionError = nil
+                        self.viewPlansUrl = result.viewPlansUrl
                         self.markVerificationSuccess()
                         self.log("Subscription verified — access granted, credentials saved", level: .info)
                     } else {
-                        self.subscriptionStatus = .inactive
-                        self.subscriptionError = nil
-                        self.log("No active subscription — credentials saved for next attempt", level: .warning)
+                        switch result.reason {
+                        case "invalid_credentials":
+                            self.subscriptionStatus = .loginFailed("Invalid email or password.")
+                            self.subscriptionError = "Invalid email or password."
+                            self.log("Invalid credentials — not saving", level: .error)
+                        case "inactive_subscription", "no_purchase":
+                            self.savedEmail = email
+                            self.savedPassword = password
+                            KeychainHelper.saveCredentials(email: email, password: password)
+                            self.subscriptionStatus = .inactive
+                            self.subscriptionError = nil
+                            self.viewPlansUrl = result.viewPlansUrl
+                            self.log("No active subscription — credentials saved for next attempt", level: .warning)
+                        default:
+                            let message = "Verification failed. Please try again later."
+                            self.subscriptionStatus = .loginFailed(message)
+                            self.subscriptionError = message
+                            self.log("Unknown reason: \(result.reason ?? "nil")", level: .error)
+                        }
                     }
                 }
             } catch let error as SubscriptionServiceError {
                 await MainActor.run {
                     switch error {
-                    case .invalidCredentials:
-                        // Bad email/password — don't save credentials
-                        self.subscriptionStatus = .loginFailed(error.localizedDescription)
-                        self.subscriptionError = error.localizedDescription
-                        self.log("Invalid credentials — not saving", level: .error)
-                    default:
-                        // Network or other errors — save credentials so they can retry on relaunch
+                    case .networkError:
+                        // Network errors — save credentials so they can retry on relaunch
                         self.savedEmail = email
                         self.savedPassword = password
                         KeychainHelper.saveCredentials(email: email, password: password)
+                        let message = "Cannot reach server. Check your internet connection."
+                        self.subscriptionStatus = .loginFailed(message)
+                        self.subscriptionError = message
+                        self.log("Network error — credentials saved for retry", level: .error)
+                    default:
                         let message = error.localizedDescription
                         self.subscriptionStatus = .loginFailed(message)
                         self.subscriptionError = message
-                        self.log("Login check failed: \(message) — credentials saved for retry", level: .error)
+                        self.log("Login check failed: \(message)", level: .error)
                     }
                 }
             } catch {
@@ -611,17 +627,25 @@ class AppState: ObservableObject {
 
         Task {
             do {
-                let isActive = try await subscriptionService.checkSubscription(
+                let result = try await subscriptionService.verifyLicense(
                     email: email,
                     password: password
                 )
                 await MainActor.run {
                     self.isBackgroundVerifying = false
-                    if isActive {
+                    self.viewPlansUrl = result.viewPlansUrl
+
+                    if result.accessGranted {
                         self.markVerificationSuccess()
                         self.log("Background verification passed", level: .info)
+                    } else if result.reason == "invalid_credentials" {
+                        self.log("Background verification: credentials invalid — requiring re-login", level: .warning)
+                        self.subscriptionStatus = .notChecked
+                        self.subscriptionError = "Your session has expired. Please sign in again."
+                        KeychainHelper.clearCredentials()
+                        self.clearGracePeriod()
                     } else {
-                        // Subscription inactive — check grace period
+                        // Subscription inactive / no purchase — check grace period
                         if self.isWithinGracePeriod() {
                             self.log("Background verification: subscription inactive but within grace period — keeping access", level: .warning)
                         } else {
@@ -632,26 +656,11 @@ class AppState: ObservableObject {
                         }
                     }
                 }
-            } catch let error as SubscriptionServiceError {
-                await MainActor.run {
-                    self.isBackgroundVerifying = false
-                    switch error {
-                    case .invalidCredentials:
-                        self.log("Background verification: credentials invalid — requiring re-login", level: .warning)
-                        self.subscriptionStatus = .notChecked
-                        self.subscriptionError = "Your session has expired. Please sign in again."
-                        KeychainHelper.clearCredentials()
-                        self.clearGracePeriod()
-                    default:
-                        // Network errors or transient issues — keep user logged in
-                        self.log("Background verification failed (network/transient): \(error.localizedDescription) — keeping access", level: .warning)
-                    }
-                }
             } catch {
                 await MainActor.run {
                     self.isBackgroundVerifying = false
-                    // Unknown errors — keep user logged in
-                    self.log("Background verification error (non-critical): \(error.localizedDescription) — keeping access", level: .warning)
+                    // Network errors or transient issues — keep user logged in
+                    self.log("Background verification failed (network/transient): \(error.localizedDescription) — keeping access", level: .warning)
                 }
             }
         }
