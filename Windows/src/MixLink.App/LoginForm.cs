@@ -1,153 +1,152 @@
+using System.Diagnostics;
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
 namespace MixLink.App;
 
 public sealed class LoginForm : Form
 {
-    private readonly TextBox _emailBox;
-    private readonly TextBox _passwordBox;
-    private readonly Button _loginButton;
+    private readonly RoundedField _emailField;
+    private readonly RoundedField _passwordField;
+    private readonly MixLinkButton _loginButton;
+    private readonly ProgressBar _progress;
     private readonly Label _errorLabel;
-    private readonly Label _loadingLabel;
+    private readonly ContextMenuStrip _menu;
 
     public bool LoginSuccess { get; private set; }
 
     public LoginForm()
     {
-        Text = "Cymatics Link";
-        FormBorderStyle = FormBorderStyle.FixedDialog;
+        Text = "Cymatics Mix Link";
+        FormBorderStyle = FormBorderStyle.None;
         StartPosition = FormStartPosition.CenterScreen;
         MaximizeBox = false;
         MinimizeBox = false;
-        Size = new Size(380, 420);
-        BackColor = Color.FromArgb(24, 24, 28);
+        ShowInTaskbar = true;
+        Size = new Size(300, 420);
+        BackColor = MixLinkTheme.Background;
         Font = new Font("Segoe UI", 10);
+        DoubleBuffered = true;
 
-        var brandLabel = new Label
+        Region = Region.FromHrgn(Native.CreateRoundRectRgn(0, 0, Width + 1, Height + 1, 16, 16));
+
+        // Header (traffic lights + hamburger)
+        var close = new TrafficLightButton(TrafficLightKind.Close) { Location = new Point(12, 10) };
+        close.Click += (_, _) => Close();
+        var minimize = new TrafficLightButton(TrafficLightKind.Minimize) { Location = new Point(32, 10) };
+        minimize.Click += (_, _) => Hide();
+
+        _menu = new ContextMenuStrip();
+        _menu.Items.Add("Help", null, (_, _) => OpenUrl($"mailto:support@cymatics.fm"));
+        _menu.Items.Add(new ToolStripSeparator());
+        _menu.Items.Add("Quit", null, (_, _) => Application.Exit());
+
+        var hamburger = new HamburgerButton { Location = new Point(Width - 12 - 28, 6) };
+        hamburger.Click += (_, _) => _menu.Show(hamburger, new Point(0, hamburger.Height));
+
+        // Cymatics wordmark + MIX LINK
+        var wordmark = new WordmarkControl
         {
-            Text = "CYMATICS",
-            Font = new Font("Segoe UI", 28, FontStyle.Bold),
+            Location = new Point(0, 52),
+            Size = new Size(Width, 20),
+            ForeColor = Color.White
+        };
+        var title = new Label
+        {
+            Text = "MIX LINK",
+            Font = new Font("Segoe UI Semibold", 24, FontStyle.Regular),
             ForeColor = Color.White,
             AutoSize = false,
-            Size = new Size(340, 50),
+            Size = new Size(Width, 34),
             TextAlign = ContentAlignment.MiddleCenter,
-            Location = new Point(20, 30)
+            Location = new Point(0, 70)
         };
 
-        var subtitleLabel = new Label
+        // Form fields (match SwiftUI styling)
+        _emailField = new RoundedField("Email", isPassword: false)
         {
-            Text = "Sign in to continue",
-            Font = new Font("Segoe UI", 10),
-            ForeColor = Color.FromArgb(140, 140, 140),
-            AutoSize = false,
-            Size = new Size(340, 22),
-            TextAlign = ContentAlignment.MiddleCenter,
-            Location = new Point(20, 82)
+            Location = new Point(24, 140),
+            Size = new Size(252, 42)
         };
 
-        var emailLabel = new Label
+        _passwordField = new RoundedField("Password", isPassword: true)
         {
-            Text = "Email",
-            Font = new Font("Segoe UI", 9),
-            ForeColor = Color.FromArgb(180, 180, 180),
-            AutoSize = true,
-            Location = new Point(38, 125)
+            Location = new Point(24, 196),
+            Size = new Size(252, 42)
         };
 
-        _emailBox = new TextBox
-        {
-            Size = new Size(300, 30),
-            Location = new Point(40, 147),
-            Font = new Font("Segoe UI", 11),
-            BackColor = Color.FromArgb(40, 40, 46),
-            ForeColor = Color.White,
-            BorderStyle = BorderStyle.FixedSingle
-        };
-
-        var passwordLabel = new Label
-        {
-            Text = "Password",
-            Font = new Font("Segoe UI", 9),
-            ForeColor = Color.FromArgb(180, 180, 180),
-            AutoSize = true,
-            Location = new Point(38, 190)
-        };
-
-        _passwordBox = new TextBox
-        {
-            Size = new Size(300, 30),
-            Location = new Point(40, 212),
-            Font = new Font("Segoe UI", 11),
-            BackColor = Color.FromArgb(40, 40, 46),
-            ForeColor = Color.White,
-            BorderStyle = BorderStyle.FixedSingle,
-            UseSystemPasswordChar = true
-        };
-
-        _loginButton = new Button
+        _loginButton = new MixLinkButton
         {
             Text = "Sign In",
-            Size = new Size(300, 42),
-            Location = new Point(40, 265),
-            Font = new Font("Segoe UI", 11, FontStyle.Bold),
-            ForeColor = Color.White,
-            BackColor = Color.FromArgb(0, 150, 220),
-            FlatStyle = FlatStyle.Flat,
-            Cursor = Cursors.Hand
+            Location = new Point(24, 252),
+            Size = new Size(252, 44),
+            Font = new Font("Segoe UI", 14, FontStyle.Bold),
+            ForeColor = Color.Black
         };
-        _loginButton.FlatAppearance.BorderSize = 0;
         _loginButton.Click += OnLoginClick;
 
         _errorLabel = new Label
         {
             Text = "",
-            Font = new Font("Segoe UI", 9),
-            ForeColor = Color.FromArgb(239, 68, 68),
+            Font = new Font("Segoe UI", 11),
+            ForeColor = Color.FromArgb(239, 68, 68), // #ef4444
             AutoSize = false,
-            Size = new Size(300, 36),
+            Size = new Size(252, 44),
             TextAlign = ContentAlignment.MiddleCenter,
-            Location = new Point(40, 315),
+            Location = new Point(24, 302),
             Visible = false
         };
 
-        _loadingLabel = new Label
+        _progress = new ProgressBar
         {
-            Text = "Verifying...",
-            Font = new Font("Segoe UI", 9),
-            ForeColor = Color.FromArgb(0, 212, 255),
-            AutoSize = false,
-            Size = new Size(300, 20),
-            TextAlign = ContentAlignment.MiddleCenter,
-            Location = new Point(40, 315),
+            Style = ProgressBarStyle.Marquee,
+            MarqueeAnimationSpeed = 28,
+            Size = new Size(252, 4),
+            Location = new Point(24, 302),
             Visible = false
         };
 
-        Controls.Add(brandLabel);
-        Controls.Add(subtitleLabel);
-        Controls.Add(emailLabel);
-        Controls.Add(_emailBox);
-        Controls.Add(passwordLabel);
-        Controls.Add(_passwordBox);
+        var forgot = new LinkLabel
+        {
+            Text = "Forgot Password?",
+            LinkColor = MixLinkTheme.Cyan,
+            ActiveLinkColor = MixLinkTheme.Teal,
+            VisitedLinkColor = MixLinkTheme.Cyan,
+            LinkBehavior = LinkBehavior.NeverUnderline,
+            Font = new Font("Segoe UI", 11, FontStyle.Regular),
+            AutoSize = false,
+            Size = new Size(252, 22),
+            TextAlign = ContentAlignment.MiddleCenter,
+            Location = new Point(24, 355)
+        };
+        forgot.Click += (_, _) => OpenUrl("https://cymatics.fm/pages/forgot-password");
+
+        Controls.Add(close);
+        Controls.Add(minimize);
+        Controls.Add(hamburger);
+        Controls.Add(wordmark);
+        Controls.Add(title);
+        Controls.Add(_emailField);
+        Controls.Add(_passwordField);
         Controls.Add(_loginButton);
         Controls.Add(_errorLabel);
-        Controls.Add(_loadingLabel);
-
-        AcceptButton = _loginButton;
+        Controls.Add(_progress);
+        Controls.Add(forgot);
 
         var stored = LicenseService.LoadCredentials();
         if (stored is not null)
         {
-            _emailBox.Text = stored.Email;
-            _passwordBox.Text = stored.Password;
+            _emailField.Value = stored.Email;
+            _passwordField.Value = stored.Password;
         }
+
+        Shown += (_, _) => _emailField.FocusInput();
     }
 
     private async void OnLoginClick(object? sender, EventArgs e)
     {
-        var email = _emailBox.Text.Trim();
-        var password = _passwordBox.Text;
+        var email = _emailField.Value.Trim();
+        var password = _passwordField.Value;
 
         if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(password))
         {
@@ -210,16 +209,123 @@ public sealed class LoginForm : Form
     {
         _errorLabel.Text = message;
         _errorLabel.Visible = true;
-        _loadingLabel.Visible = false;
+        _progress.Visible = false;
     }
 
     private void SetLoading(bool loading)
     {
         _loginButton.Enabled = !loading;
-        _emailBox.Enabled = !loading;
-        _passwordBox.Enabled = !loading;
-        _loadingLabel.Visible = loading;
+        _emailField.Enabled = !loading;
+        _passwordField.Enabled = !loading;
+        _progress.Visible = loading;
         if (loading) _errorLabel.Visible = false;
-        _loginButton.Text = loading ? "Verifying..." : "Sign In";
+        _loginButton.Text = loading ? "Sign In" : "Sign In";
+    }
+
+    private static void OpenUrl(string url)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch { }
+    }
+
+    private sealed class WordmarkControl : Control
+    {
+        public WordmarkControl()
+        {
+            SetStyle(ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            e.Graphics.Clear(Parent?.BackColor ?? MixLinkTheme.Background);
+            var h = 11f;
+            var w = 260f;
+            var rect = new RectangleF((Width - w) / 2f, (Height - h) / 2f, w, h);
+            CymaticsWordmark.Draw(e.Graphics, rect, ForeColor);
+        }
+    }
+
+    private sealed class RoundedField : Panel
+    {
+        private readonly TextBox _box;
+        private readonly string _placeholder;
+        private bool _focused;
+
+        [System.ComponentModel.Browsable(false)]
+        [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+        public string Value
+        {
+            get => _box.Text;
+            set => _box.Text = value;
+        }
+
+        public RoundedField(string placeholder, bool isPassword)
+        {
+            _placeholder = placeholder;
+            DoubleBuffered = true;
+            BackColor = Color.Transparent;
+            _box = new TextBox
+            {
+                BorderStyle = BorderStyle.None,
+                ForeColor = Color.White,
+                BackColor = Color.FromArgb(0, 0, 0, 0),
+                Font = new Font("Segoe UI", 13),
+                UseSystemPasswordChar = isPassword,
+                Location = new Point(10, 12),
+                Width = 999
+            };
+            _box.GotFocus += (_, _) => { _focused = true; Invalidate(); };
+            _box.LostFocus += (_, _) => { _focused = false; Invalidate(); };
+            _box.TextChanged += (_, _) => Invalidate();
+            Controls.Add(_box);
+            Padding = new Padding(10);
+        }
+
+        public void FocusInput() => _box.Focus();
+
+        protected override void OnResize(EventArgs eventargs)
+        {
+            base.OnResize(eventargs);
+            _box.Width = Width - 20;
+            _box.Location = new Point(10, (Height - _box.Height) / 2);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            e.Graphics.Clear(Parent?.BackColor ?? MixLinkTheme.Background);
+
+            var rect = ClientRectangle;
+            rect.Inflate(-1, -1);
+
+            using var fill = new SolidBrush(MixLinkTheme.White15);
+            MixLinkPaint.FillRoundedRect(e.Graphics, fill, rect, 8f);
+
+            using var pen = new Pen(_focused ? Color.FromArgb(140, MixLinkTheme.Cyan) : MixLinkTheme.White25, 1f);
+            MixLinkPaint.StrokeRoundedRect(e.Graphics, pen, rect, 8f);
+
+            if (string.IsNullOrEmpty(_box.Text) && !_focused)
+            {
+                var phColor = Color.FromArgb(128, 255, 255, 255); // 0.5
+                TextRenderer.DrawText(
+                    e.Graphics,
+                    _placeholder,
+                    _box.Font,
+                    new Rectangle(10, 0, Width - 20, Height),
+                    phColor,
+                    TextFormatFlags.VerticalCenter | TextFormatFlags.Left
+                );
+            }
+        }
+    }
+
+    private static class Native
+    {
+        [System.Runtime.InteropServices.DllImport("gdi32.dll", SetLastError = true)]
+        public static extern IntPtr CreateRoundRectRgn(int nLeftRect, int nTopRect, int nRightRect, int nBottomRect, int nWidthEllipse, int nHeightEllipse);
     }
 }

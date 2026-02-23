@@ -1,4 +1,6 @@
 using System.Drawing;
+using System.Runtime.InteropServices;
+using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
 namespace MixLink.App;
@@ -39,8 +41,8 @@ public sealed class TrayApplication : ApplicationContext
         // Create tray icon
         _trayIcon = new NotifyIcon
         {
-            Icon = CreateTrayIcon(false),
-            Text = "Cymatics Link - Click to show QR",
+            Icon = CreateTrayIcon(isRunning: false, isActive: false),
+            Text = "Cymatics Mix Link - Click to show QR",
             ContextMenuStrip = contextMenu,
             Visible = true
         };
@@ -119,12 +121,13 @@ public sealed class TrayApplication : ApplicationContext
 
     private void UpdateTrayIcon()
     {
-        var isActive = _appState.IsServerRunning && _appState.WebClientsConnected > 0;
+        var isRunning = _appState.IsServerRunning;
+        var isActive = isRunning && _appState.WebClientsConnected > 0;
 
-        _trayIcon.Icon = CreateTrayIcon(isActive);
-        _trayIcon.Text = _appState.IsServerRunning
-            ? $"Cymatics Link - {_appState.WebClientsConnected} clients"
-            : "Cymatics Link - Stopped";
+        _trayIcon.Icon = CreateTrayIcon(isRunning: isRunning, isActive: isActive);
+        _trayIcon.Text = isRunning
+            ? $"Cymatics Mix Link - {_appState.WebClientsConnected} phones"
+            : "Cymatics Mix Link - Stopped";
 
         _startStopItem.Text = _appState.IsServerRunning ? "Stop" : "Start";
     }
@@ -137,35 +140,80 @@ public sealed class TrayApplication : ApplicationContext
 
     /// <summary>
     /// Create a simple tray icon programmatically.
-    /// Blue circle with play symbol when active, gray when idle.
+    /// 5-bar waveform icon (matching macOS menubar icon).
     /// </summary>
-    private static Icon CreateTrayIcon(bool isActive)
+    private static Icon CreateTrayIcon(bool isRunning, bool isActive)
     {
         const int size = 32;
-        using var bitmap = new Bitmap(size, size);
+        using var bitmap = new Bitmap(size, size, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
         using var g = Graphics.FromImage(bitmap);
 
-        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
         g.Clear(Color.Transparent);
 
-        // Draw circle
-        var circleColor = isActive ? Color.FromArgb(0, 212, 255) : Color.FromArgb(128, 128, 128);
-        using var brush = new SolidBrush(circleColor);
-        g.FillEllipse(brush, 2, 2, size - 4, size - 4);
+        // Bars match mac proportions: [0.35, 0.7, 1.0, 0.7, 0.35]
+        float[] barHeights = [0.35f, 0.7f, 1.0f, 0.7f, 0.35f];
+        float barW = 2f;
+        float gap = 2f;
+        float maxH = 16f;
+        float totalW = barHeights.Length * barW + (barHeights.Length - 1) * gap;
+        float startX = (size - totalW) / 2f;
+        float baseY = (size - maxH) / 2f + maxH;
 
-        // Draw play triangle
-        var triangleColor = isActive ? Color.White : Color.FromArgb(64, 64, 64);
-        using var triangleBrush = new SolidBrush(triangleColor);
-        var points = new Point[]
+        var cyan = Color.FromArgb(0, 212, 255); // #00D4FF
+        var teal = Color.FromArgb(0, 255, 212); // #00FFD4
+        var gray = Color.FromArgb(128, 128, 128);
+        var dimGray = Color.FromArgb(90, 90, 90);
+
+        using var activeBrush = new LinearGradientBrush(
+            new RectangleF(0, 0, size, size),
+            cyan,
+            teal,
+            LinearGradientMode.ForwardDiagonal
+        );
+        using var idleBrush = new SolidBrush(isRunning ? Color.FromArgb(190, cyan) : gray);
+
+        for (int i = 0; i < barHeights.Length; i++)
         {
-            new(12, 8),
-            new(12, 24),
-            new(24, 16)
-        };
-        g.FillPolygon(triangleBrush, points);
+            float h = maxH * barHeights[i];
+            float x = startX + i * (barW + gap);
+            float y = baseY - h;
+            float cr = 1f;
 
-        return Icon.FromHandle(bitmap.GetHicon());
+            using var path = new GraphicsPath();
+            path.AddArc(x, y, cr * 2, cr * 2, 180, 90);
+            path.AddArc(x + barW - cr * 2, y, cr * 2, cr * 2, 270, 90);
+            path.AddArc(x + barW - cr * 2, y + h - cr * 2, cr * 2, cr * 2, 0, 90);
+            path.AddArc(x, y + h - cr * 2, cr * 2, cr * 2, 90, 90);
+            path.CloseAllFigures();
+
+            if (isActive)
+                g.FillPath(activeBrush, path);
+            else
+                g.FillPath(idleBrush, path);
+        }
+
+        // Slash when stopped (mac "slashed" state)
+        if (!isRunning)
+        {
+            using var pen = new Pen(dimGray, 2f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+            g.DrawLine(pen, (size * 0.78f), (size * 0.72f), (size * 0.22f), (size * 0.28f));
+        }
+
+        IntPtr hIcon = bitmap.GetHicon();
+        try
+        {
+            using var tmp = Icon.FromHandle(hIcon);
+            return (Icon)tmp.Clone();
+        }
+        finally
+        {
+            DestroyIcon(hIcon);
+        }
     }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool DestroyIcon(IntPtr hIcon);
 
     protected override void Dispose(bool disposing)
     {
