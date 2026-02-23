@@ -18,8 +18,8 @@ internal static class Program
         if (!createdNew)
         {
             MessageBox.Show(
-                "Cymatics Link is already running.\nCheck the system tray.",
-                "Cymatics Link",
+                "Cymatics Mix Link is already running.\nCheck the system tray.",
+                "Cymatics Mix Link",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information
             );
@@ -36,7 +36,7 @@ internal static class Program
         {
             MessageBox.Show(
                 $"An error occurred: {e.Exception.Message}",
-                "Cymatics Link Error",
+                "Cymatics Mix Link Error",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error
             );
@@ -48,7 +48,7 @@ internal static class Program
             {
                 MessageBox.Show(
                     $"A fatal error occurred: {ex.Message}",
-                    "Cymatics Link Error",
+                    "Cymatics Mix Link Error",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error
                 );
@@ -61,6 +61,14 @@ internal static class Program
 
         if (result != DialogResult.OK || !loginForm.LoginSuccess)
             return;
+
+        // Show onboarding on first launch
+        if (!OnboardingForm.IsComplete)
+        {
+            using var onboarding = new OnboardingForm();
+            if (onboarding.ShowDialog() != DialogResult.OK)
+                return;
+        }
 
         // License verified — run the application
         Application.Run(new TrayApplication());

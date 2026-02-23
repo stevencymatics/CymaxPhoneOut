@@ -7,6 +7,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
+    <AssemblyName>Cymatics Mix Link</AssemblyName>
+    <AssemblyTitle>Cymatics Mix Link</AssemblyTitle>
+    <Product>Cymatics Mix Link</Product>
+    <ApplicationIcon>app.ico</ApplicationIcon>
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
