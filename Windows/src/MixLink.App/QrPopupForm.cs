@@ -26,7 +26,7 @@ public sealed class QrPopupForm : Form
 
         FormBorderStyle = FormBorderStyle.None;
         StartPosition = FormStartPosition.Manual;
-        ClientSize = new Size(W, 520);
+        ClientSize = new Size(W, 435);
         BackColor = MixLinkTheme.Background;
         ShowInTaskbar = false;
         TopMost = true;

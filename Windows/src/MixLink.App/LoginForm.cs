@@ -21,7 +21,7 @@ public sealed class LoginForm : Form
         FormBorderStyle = FormBorderStyle.None;
         StartPosition = FormStartPosition.CenterScreen;
         ShowInTaskbar = true;
-        ClientSize = new Size(380, 480);
+        ClientSize = new Size(380, 380);
         BackColor = MixLinkTheme.Background;
         DoubleBuffered = true;
 
