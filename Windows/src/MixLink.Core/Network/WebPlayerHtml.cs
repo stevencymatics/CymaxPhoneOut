@@ -33,16 +33,21 @@ public static class WebPlayerHtml
             -ms-touch-action: manipulation;
         }}
 
+        html, body {{
+            height: 100%;
+            height: 100dvh;
+            overflow: hidden;
+        }}
+
         body {{
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: #000;
-            min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
             color: #fff;
-            padding: 10px;
+            margin: 0;
+            padding: 0;
             touch-action: manipulation;
             -webkit-touch-callout: none;
             -webkit-user-select: none;
@@ -54,12 +59,14 @@ public static class WebPlayerHtml
             text-align: center;
             max-width: 100%;
             width: 100%;
+            height: 100%;
             padding: 0 10px;
-            padding-top: 12vh;
-            flex: 1;
+            padding-top: env(safe-area-inset-top, 10px);
+            padding-bottom: env(safe-area-inset-bottom, 10px);
             display: flex;
             flex-direction: column;
             align-items: center;
+            justify-content: space-evenly;
         }}
 
         .branding {{
@@ -82,8 +89,7 @@ public static class WebPlayerHtml
 
         .subtitle {{
             color: #888;
-            margin-top: 32px;
-            margin-bottom: 0;
+            margin: 0;
             font-size: 1.2rem;
         }}
 
@@ -94,7 +100,8 @@ public static class WebPlayerHtml
             border: none;
             background: linear-gradient(135deg, #00d4ff 0%, #00ffd4 100%);
             cursor: pointer;
-            margin: auto auto 35px;
+            margin: 0;
+            flex-shrink: 0;
             transition: all 0.2s;
             display: flex;
             align-items: center;
@@ -137,8 +144,10 @@ public static class WebPlayerHtml
 
         .visualizer-container {{
             width: 100%;
-            height: 120px;
-            margin: 10px 0 15px 0;
+            height: 100px;
+            flex-shrink: 1;
+            min-height: 60px;
+            margin: 0;
             display: flex;
             align-items: flex-end;
             justify-content: center;
@@ -162,7 +171,7 @@ public static class WebPlayerHtml
             align-items: center;
             justify-content: center;
             gap: 8px;
-            margin-bottom: 20px;
+            margin: 0;
         }}
 
         .status-dot {{
@@ -197,7 +206,7 @@ public static class WebPlayerHtml
         }}
 
         .stats {{
-            margin-top: 10px;
+            margin: 0;
             display: flex;
             align-items: flex-end;
             justify-content: center;
