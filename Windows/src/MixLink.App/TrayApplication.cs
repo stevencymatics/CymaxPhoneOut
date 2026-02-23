@@ -5,9 +5,6 @@ using System.Windows.Forms;
 
 namespace MixLink.App;
 
-/// <summary>
-/// System tray application with NotifyIcon and context menu.
-/// </summary>
 public sealed class TrayApplication : ApplicationContext
 {
     private readonly NotifyIcon _trayIcon;
@@ -21,12 +18,8 @@ public sealed class TrayApplication : ApplicationContext
         _appState = new AppState();
         _appState.OnStateChanged += UpdateTrayIcon;
         _appState.OnClientCountChanged += count => UpdateClientCount(count);
-        _appState.OnLog += (msg, level) =>
-        {
-            // Could be extended to show notifications for errors
-        };
+        _appState.OnLog += (msg, level) => { };
 
-        // Create context menu
         _startStopItem = new ToolStripMenuItem("Start", null, OnStartStop);
         _clientsItem = new ToolStripMenuItem("Clients: 0") { Enabled = false };
 
@@ -38,11 +31,10 @@ public sealed class TrayApplication : ApplicationContext
         contextMenu.Items.Add(new ToolStripSeparator());
         contextMenu.Items.Add("Exit", null, OnExit);
 
-        // Create tray icon
         _trayIcon = new NotifyIcon
         {
             Icon = CreateTrayIcon(isRunning: false, isActive: false),
-            Text = "Cymatics Mix Link - Click to show QR",
+            Text = "Cymatics Mix Link",
             ContextMenuStrip = contextMenu,
             Visible = true
         };
@@ -50,66 +42,37 @@ public sealed class TrayApplication : ApplicationContext
         _trayIcon.Click += OnTrayClick;
         _trayIcon.DoubleClick += OnTrayDoubleClick;
 
-        // Auto-start the server
         _appState.StartServer();
+
+        // Auto-show the QR popup on launch
+        ShowQrPopup();
     }
 
     private void OnTrayClick(object? sender, EventArgs e)
     {
-        // Check if it was a left-click (MouseEventArgs)
         if (e is MouseEventArgs me && me.Button == MouseButtons.Left)
-        {
             ShowQrPopup();
-        }
     }
 
-    private void OnTrayDoubleClick(object? sender, EventArgs e)
-    {
-        ShowQrPopup();
-    }
+    private void OnTrayDoubleClick(object? sender, EventArgs e) => ShowQrPopup();
 
     private void OnStartStop(object? sender, EventArgs e)
     {
-        if (_appState.IsServerRunning)
-        {
-            _appState.StopServer();
-        }
-        else
-        {
-            _appState.StartServer();
-        }
+        if (_appState.IsServerRunning) _appState.StopServer();
+        else _appState.StartServer();
     }
 
-    private void OnShowQrCode(object? sender, EventArgs e)
-    {
-        ShowQrPopup();
-    }
+    private void OnShowQrCode(object? sender, EventArgs e) => ShowQrPopup();
 
     private void ShowQrPopup()
     {
         if (_qrPopup == null || _qrPopup.IsDisposed)
-        {
             _qrPopup = new QrPopupForm(_appState);
-        }
 
         if (_qrPopup.Visible)
-        {
             _qrPopup.Hide();
-        }
         else
-        {
-            // Position near tray icon
-            var screen = Screen.PrimaryScreen?.WorkingArea ?? new Rectangle(0, 0, 1920, 1080);
-            var popupSize = _qrPopup.Size;
-
-            // Position in bottom-right corner (where tray usually is)
-            int x = screen.Right - popupSize.Width - 20;
-            int y = screen.Bottom - popupSize.Height - 20;
-
-            _qrPopup.Location = new Point(x, y);
-            _qrPopup.Show();
-            _qrPopup.Activate();
-        }
+            _qrPopup.ShowNearTray();
     }
 
     private void OnExit(object? sender, EventArgs e)
@@ -129,7 +92,7 @@ public sealed class TrayApplication : ApplicationContext
             ? $"Cymatics Mix Link - {_appState.WebClientsConnected} phones"
             : "Cymatics Mix Link - Stopped";
 
-        _startStopItem.Text = _appState.IsServerRunning ? "Stop" : "Start";
+        _startStopItem.Text = isRunning ? "Stop" : "Start";
     }
 
     private void UpdateClientCount(int count)
@@ -138,10 +101,6 @@ public sealed class TrayApplication : ApplicationContext
         UpdateTrayIcon();
     }
 
-    /// <summary>
-    /// Create a simple tray icon programmatically.
-    /// 5-bar waveform icon (matching macOS menubar icon).
-    /// </summary>
     private static Icon CreateTrayIcon(bool isRunning, bool isActive)
     {
         const int size = 32;
@@ -151,34 +110,27 @@ public sealed class TrayApplication : ApplicationContext
         g.SmoothingMode = SmoothingMode.AntiAlias;
         g.Clear(Color.Transparent);
 
-        // Bars match mac proportions: [0.35, 0.7, 1.0, 0.7, 0.35]
         float[] barHeights = [0.35f, 0.7f, 1.0f, 0.7f, 0.35f];
-        float barW = 2f;
-        float gap = 2f;
-        float maxH = 16f;
+        float barW = 4f;
+        float gap = 2.5f;
+        float maxH = 22f;
         float totalW = barHeights.Length * barW + (barHeights.Length - 1) * gap;
         float startX = (size - totalW) / 2f;
-        float baseY = (size - maxH) / 2f + maxH;
+        float baseY = (size + maxH) / 2f;
 
-        var cyan = Color.FromArgb(0, 212, 255); // #00D4FF
-        var teal = Color.FromArgb(0, 255, 212); // #00FFD4
-        var gray = Color.FromArgb(128, 128, 128);
-        var dimGray = Color.FromArgb(90, 90, 90);
+        var cyan = Color.FromArgb(0, 212, 255);
 
-        using var activeBrush = new LinearGradientBrush(
-            new RectangleF(0, 0, size, size),
-            cyan,
-            teal,
-            LinearGradientMode.ForwardDiagonal
-        );
-        using var idleBrush = new SolidBrush(isRunning ? Color.FromArgb(190, cyan) : gray);
+        using var cyanBrush = new SolidBrush(cyan);
+        using var dimBrush = new SolidBrush(Color.FromArgb(100, 100, 100));
+
+        Brush barBrush = isRunning ? cyanBrush : dimBrush;
 
         for (int i = 0; i < barHeights.Length; i++)
         {
             float h = maxH * barHeights[i];
             float x = startX + i * (barW + gap);
             float y = baseY - h;
-            float cr = 1f;
+            float cr = barW / 2f;
 
             using var path = new GraphicsPath();
             path.AddArc(x, y, cr * 2, cr * 2, 180, 90);
@@ -187,17 +139,13 @@ public sealed class TrayApplication : ApplicationContext
             path.AddArc(x, y + h - cr * 2, cr * 2, cr * 2, 90, 90);
             path.CloseAllFigures();
 
-            if (isActive)
-                g.FillPath(activeBrush, path);
-            else
-                g.FillPath(idleBrush, path);
+            g.FillPath(barBrush, path);
         }
 
-        // Slash when stopped (mac "slashed" state)
         if (!isRunning)
         {
-            using var pen = new Pen(dimGray, 2f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
-            g.DrawLine(pen, (size * 0.78f), (size * 0.72f), (size * 0.22f), (size * 0.28f));
+            using var pen = new Pen(Color.FromArgb(90, 90, 90), 2.5f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+            g.DrawLine(pen, size * 0.8f, size * 0.75f, size * 0.2f, size * 0.25f);
         }
 
         IntPtr hIcon = bitmap.GetHicon();

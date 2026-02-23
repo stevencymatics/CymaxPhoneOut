@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
 namespace MixLink.App;
@@ -11,7 +12,6 @@ public sealed class LoginForm : Form
     private readonly MixLinkButton _loginButton;
     private readonly ProgressBar _progress;
     private readonly Label _errorLabel;
-    private readonly ContextMenuStrip _menu;
 
     public bool LoginSuccess { get; private set; }
 
@@ -20,91 +20,95 @@ public sealed class LoginForm : Form
         Text = "Cymatics Mix Link";
         FormBorderStyle = FormBorderStyle.None;
         StartPosition = FormStartPosition.CenterScreen;
-        MaximizeBox = false;
-        MinimizeBox = false;
         ShowInTaskbar = true;
-        Size = new Size(300, 420);
+        ClientSize = new Size(380, 480);
         BackColor = MixLinkTheme.Background;
-        Font = new Font("Segoe UI", 10);
         DoubleBuffered = true;
 
-        Region = Region.FromHrgn(Native.CreateRoundRectRgn(0, 0, Width + 1, Height + 1, 16, 16));
+        Region = Region.FromHrgn(Native.CreateRoundRectRgn(0, 0, ClientSize.Width + 1, ClientSize.Height + 1, 16, 16));
 
-        // Header (traffic lights + hamburger)
-        var close = new TrafficLightButton(TrafficLightKind.Close) { Location = new Point(12, 10) };
+        int pad = 32;
+        int fieldW = ClientSize.Width - pad * 2;
+
+        var close = new TrafficLightButton(TrafficLightKind.Close) { Location = new Point(14, 14) };
         close.Click += (_, _) => Close();
-        var minimize = new TrafficLightButton(TrafficLightKind.Minimize) { Location = new Point(32, 10) };
+        var minimize = new TrafficLightButton(TrafficLightKind.Minimize) { Location = new Point(36, 14) };
         minimize.Click += (_, _) => Hide();
 
-        _menu = new ContextMenuStrip();
-        _menu.Items.Add("Help", null, (_, _) => OpenUrl($"mailto:support@cymatics.fm"));
-        _menu.Items.Add(new ToolStripSeparator());
-        _menu.Items.Add("Quit", null, (_, _) => Application.Exit());
+        var menu = new ContextMenuStrip();
+        menu.Items.Add("Help", null, (_, _) => OpenUrl("mailto:support@cymatics.fm"));
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Quit", null, (_, _) => Application.Exit());
+        var hamburger = new HamburgerButton { Location = new Point(ClientSize.Width - 14 - 28, 10) };
+        hamburger.Click += (_, _) => menu.Show(hamburger, new Point(0, hamburger.Height));
 
-        var hamburger = new HamburgerButton { Location = new Point(Width - 12 - 28, 6) };
-        hamburger.Click += (_, _) => _menu.Show(hamburger, new Point(0, hamburger.Height));
+        int y = 44;
 
-        // Cymatics wordmark + MIX LINK
         var wordmark = new WordmarkControl
         {
-            Location = new Point(0, 52),
-            Size = new Size(Width, 20),
+            Location = new Point(pad, y),
+            Size = new Size(fieldW, 18),
             ForeColor = Color.White
         };
+        y += 22;
+
         var title = new Label
         {
             Text = "MIX LINK",
-            Font = new Font("Segoe UI Semibold", 24, FontStyle.Regular),
+            Font = new Font("Segoe UI", 22, FontStyle.Bold),
             ForeColor = Color.White,
             AutoSize = false,
-            Size = new Size(Width, 34),
+            Size = new Size(fieldW, 36),
             TextAlign = ContentAlignment.MiddleCenter,
-            Location = new Point(0, 70)
+            Location = new Point(pad, y)
         };
+        y += 56;
 
-        // Form fields (match SwiftUI styling)
         _emailField = new RoundedField("Email", isPassword: false)
         {
-            Location = new Point(24, 140),
-            Size = new Size(252, 42)
+            Location = new Point(pad, y),
+            Size = new Size(fieldW, 40)
         };
+        y += 52;
 
         _passwordField = new RoundedField("Password", isPassword: true)
         {
-            Location = new Point(24, 196),
-            Size = new Size(252, 42)
+            Location = new Point(pad, y),
+            Size = new Size(fieldW, 40)
         };
-
-        _loginButton = new MixLinkButton
-        {
-            Text = "Sign In",
-            Location = new Point(24, 252),
-            Size = new Size(252, 44),
-            Font = new Font("Segoe UI", 14, FontStyle.Bold),
-            ForeColor = Color.Black
-        };
-        _loginButton.Click += OnLoginClick;
+        y += 52;
 
         _errorLabel = new Label
         {
             Text = "",
-            Font = new Font("Segoe UI", 11),
-            ForeColor = Color.FromArgb(239, 68, 68), // #ef4444
+            Font = new Font("Segoe UI", 9),
+            ForeColor = Color.FromArgb(239, 68, 68),
             AutoSize = false,
-            Size = new Size(252, 44),
+            Size = new Size(fieldW, 24),
             TextAlign = ContentAlignment.MiddleCenter,
-            Location = new Point(24, 302),
+            Location = new Point(pad, y),
             Visible = false
         };
-
         _progress = new ProgressBar
         {
             Style = ProgressBarStyle.Marquee,
             MarqueeAnimationSpeed = 28,
-            Size = new Size(252, 4),
-            Location = new Point(24, 302),
+            Size = new Size(fieldW, 3),
+            Location = new Point(pad, y + 10),
             Visible = false
         };
+        y += 30;
+
+        _loginButton = new MixLinkButton
+        {
+            Text = "Sign In",
+            Location = new Point(pad, y),
+            Size = new Size(fieldW, 42),
+            Font = new Font("Segoe UI", 13, FontStyle.Bold),
+            ForeColor = Color.Black
+        };
+        _loginButton.Click += OnLoginClick;
+        y += 56;
 
         var forgot = new LinkLabel
         {
@@ -113,11 +117,11 @@ public sealed class LoginForm : Form
             ActiveLinkColor = MixLinkTheme.Teal,
             VisitedLinkColor = MixLinkTheme.Cyan,
             LinkBehavior = LinkBehavior.NeverUnderline,
-            Font = new Font("Segoe UI", 11, FontStyle.Regular),
+            Font = new Font("Segoe UI", 10),
             AutoSize = false,
-            Size = new Size(252, 22),
+            Size = new Size(fieldW, 20),
             TextAlign = ContentAlignment.MiddleCenter,
-            Location = new Point(24, 355)
+            Location = new Point(pad, y)
         };
         forgot.Click += (_, _) => OpenUrl("https://cymatics.fm/pages/forgot-password");
 
@@ -128,9 +132,9 @@ public sealed class LoginForm : Form
         Controls.Add(title);
         Controls.Add(_emailField);
         Controls.Add(_passwordField);
-        Controls.Add(_loginButton);
         Controls.Add(_errorLabel);
         Controls.Add(_progress);
+        Controls.Add(_loginButton);
         Controls.Add(forgot);
 
         var stored = LicenseService.LoadCredentials();
@@ -178,78 +182,49 @@ public sealed class LoginForm : Form
                 case "no_purchase":
                     LicenseService.SaveCredentials(email, password);
                     using (var inactive = new SubscriptionInactiveForm(result.ViewPlansUrl))
-                    {
                         inactive.ShowDialog(this);
-                    }
                     break;
                 default:
                     ShowError("Verification failed. Please try again later.");
                     break;
             }
         }
-        catch (HttpRequestException)
-        {
-            ShowError("Cannot reach server. Check your internet connection.");
-        }
-        catch (TaskCanceledException)
-        {
-            ShowError("Request timed out. Please try again.");
-        }
-        catch
-        {
-            ShowError("An unexpected error occurred. Please try again.");
-        }
-        finally
-        {
-            SetLoading(false);
-        }
+        catch (HttpRequestException) { ShowError("Cannot reach server. Check your internet connection."); }
+        catch (TaskCanceledException) { ShowError("Request timed out. Please try again."); }
+        catch { ShowError("An unexpected error occurred. Please try again."); }
+        finally { SetLoading(false); }
     }
 
-    private void ShowError(string message)
-    {
-        _errorLabel.Text = message;
-        _errorLabel.Visible = true;
-        _progress.Visible = false;
-    }
+    private void ShowError(string msg) { _errorLabel.Text = msg; _errorLabel.Visible = true; _progress.Visible = false; }
 
-    private void SetLoading(bool loading)
+    private void SetLoading(bool on)
     {
-        _loginButton.Enabled = !loading;
-        _emailField.Enabled = !loading;
-        _passwordField.Enabled = !loading;
-        _progress.Visible = loading;
-        if (loading) _errorLabel.Visible = false;
-        _loginButton.Text = loading ? "Sign In" : "Sign In";
+        _loginButton.Enabled = !on;
+        _emailField.Enabled = !on;
+        _passwordField.Enabled = !on;
+        _progress.Visible = on;
+        if (on) _errorLabel.Visible = false;
     }
 
     private static void OpenUrl(string url)
     {
-        try
-        {
-            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
-        }
-        catch { }
+        try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); } catch { }
     }
 
     private sealed class WordmarkControl : Control
     {
-        public WordmarkControl()
-        {
+        public WordmarkControl() =>
             SetStyle(ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true);
-        }
 
         protected override void OnPaint(PaintEventArgs e)
         {
-            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             e.Graphics.Clear(Parent?.BackColor ?? MixLinkTheme.Background);
-            var h = 11f;
-            var w = 260f;
-            var rect = new RectangleF((Width - w) / 2f, (Height - h) / 2f, w, h);
-            CymaticsWordmark.Draw(e.Graphics, rect, ForeColor);
+            CymaticsWordmark.Draw(e.Graphics, new RectangleF(0, 0, Width, Height), Color.White);
         }
     }
 
-    private sealed class RoundedField : Panel
+    internal sealed class RoundedField : Panel
     {
         private readonly TextBox _box;
         private readonly string _placeholder;
@@ -257,75 +232,56 @@ public sealed class LoginForm : Form
 
         [System.ComponentModel.Browsable(false)]
         [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
-        public string Value
-        {
-            get => _box.Text;
-            set => _box.Text = value;
-        }
+        public string Value { get => _box.Text; set => _box.Text = value; }
 
         public RoundedField(string placeholder, bool isPassword)
         {
             _placeholder = placeholder;
             DoubleBuffered = true;
-            BackColor = Color.Transparent;
+            BackColor = MixLinkTheme.Background;
             _box = new TextBox
             {
                 BorderStyle = BorderStyle.None,
                 ForeColor = Color.White,
-                BackColor = Color.FromArgb(0, 0, 0, 0),
-                Font = new Font("Segoe UI", 13),
+                BackColor = Color.FromArgb(58, 58, 58),
+                Font = new Font("Segoe UI", 12),
                 UseSystemPasswordChar = isPassword,
-                Location = new Point(10, 12),
-                Width = 999
             };
             _box.GotFocus += (_, _) => { _focused = true; Invalidate(); };
             _box.LostFocus += (_, _) => { _focused = false; Invalidate(); };
             _box.TextChanged += (_, _) => Invalidate();
             Controls.Add(_box);
-            Padding = new Padding(10);
         }
 
         public void FocusInput() => _box.Focus();
 
-        protected override void OnResize(EventArgs eventargs)
+        protected override void OnResize(EventArgs e)
         {
-            base.OnResize(eventargs);
-            _box.Width = Width - 20;
-            _box.Location = new Point(10, (Height - _box.Height) / 2);
+            base.OnResize(e);
+            _box.Width = Width - 24;
+            _box.Location = new Point(12, (Height - _box.Height) / 2);
         }
 
         protected override void OnPaint(PaintEventArgs e)
         {
-            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             e.Graphics.Clear(Parent?.BackColor ?? MixLinkTheme.Background);
-
-            var rect = ClientRectangle;
-            rect.Inflate(-1, -1);
-
-            using var fill = new SolidBrush(MixLinkTheme.White15);
+            var rect = new RectangleF(0, 0, Width - 1, Height - 1);
+            using var fill = new SolidBrush(Color.FromArgb(38, 255, 255, 255));
             MixLinkPaint.FillRoundedRect(e.Graphics, fill, rect, 8f);
-
-            using var pen = new Pen(_focused ? Color.FromArgb(140, MixLinkTheme.Cyan) : MixLinkTheme.White25, 1f);
+            using var pen = new Pen(_focused ? Color.FromArgb(140, MixLinkTheme.Cyan) : Color.FromArgb(64, 255, 255, 255), 1f);
             MixLinkPaint.StrokeRoundedRect(e.Graphics, pen, rect, 8f);
-
             if (string.IsNullOrEmpty(_box.Text) && !_focused)
-            {
-                var phColor = Color.FromArgb(128, 255, 255, 255); // 0.5
-                TextRenderer.DrawText(
-                    e.Graphics,
-                    _placeholder,
-                    _box.Font,
-                    new Rectangle(10, 0, Width - 20, Height),
-                    phColor,
-                    TextFormatFlags.VerticalCenter | TextFormatFlags.Left
-                );
-            }
+                TextRenderer.DrawText(e.Graphics, _placeholder, _box.Font,
+                    new Rectangle(12, 0, Width - 24, Height),
+                    Color.FromArgb(128, 255, 255, 255),
+                    TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
         }
     }
 
-    private static class Native
+    internal static class Native
     {
-        [System.Runtime.InteropServices.DllImport("gdi32.dll", SetLastError = true)]
-        public static extern IntPtr CreateRoundRectRgn(int nLeftRect, int nTopRect, int nRightRect, int nBottomRect, int nWidthEllipse, int nHeightEllipse);
+        [System.Runtime.InteropServices.DllImport("gdi32.dll")]
+        public static extern IntPtr CreateRoundRectRgn(int x1, int y1, int x2, int y2, int cx, int cy);
     }
 }

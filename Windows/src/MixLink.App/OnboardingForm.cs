@@ -142,7 +142,7 @@ public sealed class OnboardingForm : Form
             {
                 Location = new Point(24, y),
                 Size = new Size(252, 70),
-                BackColor = Color.FromArgb(MixLinkTheme.White04.A, MixLinkTheme.White04.R, MixLinkTheme.White04.G, MixLinkTheme.White04.B)
+                BackColor = Color.FromArgb(30, 30, 30)
             };
 
             var iconLbl = new Label
@@ -259,7 +259,7 @@ public sealed class OnboardingForm : Form
         protected override void OnPaint(PaintEventArgs e)
         {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            e.Graphics.Clear(Color.Transparent);
+            e.Graphics.Clear(Parent?.BackColor ?? MixLinkTheme.Background);
             float dotSize = 6f;
             float gap = 8f;
             float totalW = _count * dotSize + (_count - 1) * gap;

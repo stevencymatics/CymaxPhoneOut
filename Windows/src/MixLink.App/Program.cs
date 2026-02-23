@@ -29,7 +29,7 @@ internal static class Program
         // Enable visual styles
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
-        Application.SetHighDpiMode(HighDpiMode.SystemAware);
+        Application.SetHighDpiMode(HighDpiMode.DpiUnawareGdiScaled);
 
         // Handle unhandled exceptions
         Application.ThreadException += (s, e) =>
