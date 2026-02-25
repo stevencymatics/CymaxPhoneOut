@@ -937,13 +937,17 @@ public static class WebPlayerHtml
         }}
 
         let underrunCount = 0;
+        let smoothedRateAdjust = 0;
+        let fractionalFrameAccum = 0;
+        let fadeInRemaining = 0;
+        let lastSampleL = 0;
+        let lastSampleR = 0;
+        const FADE_FRAMES = 64;
 
         function processAudio(e) {{
             const outputL = e.outputBuffer.getChannelData(0);
             const outputR = e.outputBuffer.getChannelData(1);
             const frameCount = outputL.length;
-
-            const samplesNeeded = frameCount * 2;
 
             const currentThreshold = isInitialStart ? prebufferSamples : rebufferSamples;
 
@@ -962,30 +966,77 @@ public static class WebPlayerHtml
                 }} else {{
                     isPrebuffering = false;
                     isInitialStart = false;
+                    fadeInRemaining = FADE_FRAMES;
+                    smoothedRateAdjust = 0;
+                    fractionalFrameAccum = 0;
                     debugLog('Playback started with ' + Math.round(bufferedSamples/2/outputRate*1000) + 'ms buffer', 'info');
                 }}
             }}
 
-            if (bufferedSamples < samplesNeeded) {{
+            const bufferMs = (bufferedSamples / 2) / outputRate * 1000;
+            const errorMs = bufferMs - TARGET_BUFFER_MS;
+            const rawAdjust = Math.max(-0.005, Math.min(0.005, errorMs * 0.00005));
+            smoothedRateAdjust = smoothedRateAdjust * 0.93 + rawAdjust * 0.07;
+
+            const exactReadFrames = frameCount * (1 + smoothedRateAdjust) + fractionalFrameAccum;
+            const readFrames = Math.floor(exactReadFrames);
+            fractionalFrameAccum = exactReadFrames - readFrames;
+            const readSamples = readFrames * 2;
+
+            if (bufferedSamples < readSamples + 2) {{
                 underrunCount++;
                 isPrebuffering = true;
-                debugLog('Buffer underrun #' + underrunCount + ', need ' + samplesNeeded + ', have ' + bufferedSamples + ' - rebuffering...', 'warn');
+                smoothedRateAdjust = 0;
+                fractionalFrameAccum = 0;
+                debugLog('Buffer underrun #' + underrunCount + ', have ' + Math.round(bufferMs) + 'ms - rebuffering...', 'warn');
                 for (let i = 0; i < frameCount; i++) {{
-                    outputL[i] = 0;
-                    outputR[i] = 0;
+                    const fade = i < FADE_FRAMES ? 1 - (i / FADE_FRAMES) : 0;
+                    outputL[i] = lastSampleL * fade;
+                    outputR[i] = lastSampleR * fade;
                 }}
                 return;
             }}
 
-            for (let i = 0; i < frameCount; i++) {{
-                outputL[i] = audioBuffer[readPos];
-                readPos = (readPos + 1) % BUFFER_SIZE;
+            if (readFrames === frameCount) {{
+                for (let i = 0; i < frameCount; i++) {{
+                    outputL[i] = audioBuffer[readPos];
+                    readPos = (readPos + 1) % BUFFER_SIZE;
+                    outputR[i] = audioBuffer[readPos];
+                    readPos = (readPos + 1) % BUFFER_SIZE;
+                }}
+            }} else {{
+                const ratio = readFrames / frameCount;
+                for (let i = 0; i < frameCount; i++) {{
+                    const srcPos = i * ratio;
+                    const srcIdx = Math.floor(srcPos);
+                    const frac = srcPos - srcIdx;
+                    const nextIdx = Math.min(srcIdx + 1, readFrames - 1);
 
-                outputR[i] = audioBuffer[readPos];
-                readPos = (readPos + 1) % BUFFER_SIZE;
+                    const pos0 = (readPos + srcIdx * 2) % BUFFER_SIZE;
+                    const pos1 = (readPos + nextIdx * 2) % BUFFER_SIZE;
+
+                    outputL[i] = audioBuffer[pos0] + (audioBuffer[pos1] - audioBuffer[pos0]) * frac;
+                    outputR[i] = audioBuffer[(pos0 + 1) % BUFFER_SIZE] +
+                        (audioBuffer[(pos1 + 1) % BUFFER_SIZE] - audioBuffer[(pos0 + 1) % BUFFER_SIZE]) * frac;
+                }}
+                readPos = (readPos + readSamples) % BUFFER_SIZE;
             }}
 
-            bufferedSamples -= samplesNeeded;
+            bufferedSamples -= readSamples;
+
+            if (fadeInRemaining > 0) {{
+                const startFade = FADE_FRAMES - fadeInRemaining;
+                const framesToFade = Math.min(fadeInRemaining, frameCount);
+                for (let i = 0; i < framesToFade; i++) {{
+                    const gain = (startFade + i) / FADE_FRAMES;
+                    outputL[i] *= gain;
+                    outputR[i] *= gain;
+                }}
+                fadeInRemaining -= framesToFade;
+            }}
+
+            lastSampleL = outputL[frameCount - 1];
+            lastSampleR = outputR[frameCount - 1];
 
             updateVisualizer(outputL);
         }}

@@ -36,7 +36,7 @@ public sealed class LoginForm : Form
         minimize.Click += (_, _) => Hide();
 
         var menu = new ContextMenuStrip();
-        menu.Items.Add("Help", null, (_, _) => OpenUrl("mailto:support@cymatics.fm"));
+        menu.Items.Add("Help", null, (_, _) => OpenUrl("https://cymatics.fm/pages/mix-link-faq"));
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Quit", null, (_, _) => Application.Exit());
         var hamburger = new HamburgerButton { Location = new Point(ClientSize.Width - 14 - 28, 10) };

@@ -52,7 +52,7 @@ struct HamburgerMenuButton: View {
             }
 
             Button(action: {
-                if let url = URL(string: "mailto:\(SubscriptionConfig.supportEmail)") {
+                if let url = URL(string: "https://cymatics.fm/pages/mix-link-faq") {
                     NSWorkspace.shared.open(url)
                 }
             }) {
