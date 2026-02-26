@@ -681,6 +681,12 @@ public static class WebPlayerHtml
                     updateSubtitle(true);
                     reconnectAttempts = 0;
                     document.getElementById('reconnectOverlay').classList.remove('visible');
+
+                    // Flush audio buffer on reconnect — stale data causes glitches
+                    writePos = 0;
+                    readPos = 0;
+                    bufferedSamples = 0;
+                    isPrebuffering = true;
                 }};
 
                 ws.onclose = (event) => {{
@@ -761,6 +767,12 @@ public static class WebPlayerHtml
                 reconnectAttempts = 0;
                 document.getElementById('reconnectOverlay').classList.remove('visible');
                 lastPacketTime = Date.now();
+
+                // Flush audio buffer on reconnect — stale data causes glitches
+                writePos = 0;
+                readPos = 0;
+                bufferedSamples = 0;
+                isPrebuffering = true;
 
                 httpWatchdog = setInterval(() => {{
                     const staleDuration = Date.now() - lastPacketTime;
@@ -885,8 +897,18 @@ public static class WebPlayerHtml
                 debugLog('First samples: ' + audioData.slice(0, 8).map(x => x.toFixed(4)).join(', '));
             }}
 
+            let samplesToWrite;
             if (Math.abs(resampleRatio - 1.0) > 0.001) {{
                 const outputFrames = Math.floor(inputFrames * resampleRatio);
+                samplesToWrite = outputFrames * 2;
+
+                // Overflow protection: advance readPos to discard oldest data
+                const spaceAvailable = BUFFER_SIZE - bufferedSamples;
+                if (samplesToWrite > spaceAvailable) {{
+                    const overflow = samplesToWrite - spaceAvailable;
+                    readPos = (readPos + overflow) % BUFFER_SIZE;
+                    bufferedSamples -= overflow;
+                }}
 
                 for (let outFrame = 0; outFrame < outputFrames; outFrame++) {{
                     const inFrameF = outFrame / resampleRatio;
@@ -908,13 +930,23 @@ public static class WebPlayerHtml
                     writePos = (writePos + 1) % BUFFER_SIZE;
                 }}
 
-                bufferedSamples = Math.min(bufferedSamples + outputFrames * 2, BUFFER_SIZE);
+                bufferedSamples += samplesToWrite;
             }} else {{
+                samplesToWrite = audioData.length;
+
+                // Overflow protection: advance readPos to discard oldest data
+                const spaceAvailable = BUFFER_SIZE - bufferedSamples;
+                if (samplesToWrite > spaceAvailable) {{
+                    const overflow = samplesToWrite - spaceAvailable;
+                    readPos = (readPos + overflow) % BUFFER_SIZE;
+                    bufferedSamples -= overflow;
+                }}
+
                 for (let i = 0; i < audioData.length; i++) {{
                     audioBuffer[writePos] = audioData[i];
                     writePos = (writePos + 1) % BUFFER_SIZE;
                 }}
-                bufferedSamples = Math.min(bufferedSamples + audioData.length, BUFFER_SIZE);
+                bufferedSamples += samplesToWrite;
             }}
 
             if (packetsReceived % 50 === 0) {{

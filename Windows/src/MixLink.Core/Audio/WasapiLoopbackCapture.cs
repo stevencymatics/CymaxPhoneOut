@@ -78,7 +78,8 @@ public sealed class WasapiLoopbackCapture : IDisposable
             _capture = new NAudio.Wave.WasapiLoopbackCapture();
             _captureFormat = _capture.WaveFormat;
 
-            OnStatusUpdate?.Invoke($"Device format: {_captureFormat.SampleRate}Hz, {_captureFormat.Channels}ch, {_captureFormat.BitsPerSample}bit");
+            var formatType = IsFloatFormat(_captureFormat) ? "Float" : _captureFormat.Encoding.ToString();
+            OnStatusUpdate?.Invoke($"Device format: {_captureFormat.SampleRate}Hz, {_captureFormat.Channels}ch, {_captureFormat.BitsPerSample}bit {formatType}");
 
             // Setup resampling if needed
             if (_captureFormat.SampleRate != TargetSampleRate || _captureFormat.Channels != TargetChannels)
@@ -157,6 +158,23 @@ public sealed class WasapiLoopbackCapture : IDisposable
         }
     }
 
+    private bool IsFloatFormat(WaveFormat format)
+    {
+        if (format.Encoding == WaveFormatEncoding.IeeeFloat)
+            return true;
+
+        // WASAPI loopback typically returns WaveFormatExtensible (0xFFFE)
+        // where the actual format is in the SubFormat GUID
+        if (format is WaveFormatExtensible wfe)
+        {
+            // KSDATAFORMAT_SUBTYPE_IEEE_FLOAT = {00000003-0000-0010-8000-00AA00389B71}
+            var ieeeFloatGuid = new Guid("00000003-0000-0010-8000-00AA00389B71");
+            return wfe.SubFormat == ieeeFloatGuid;
+        }
+
+        return false;
+    }
+
     private float[] ConvertToTargetFormat(byte[] buffer, int bytesRecorded)
     {
         if (_captureFormat == null)
@@ -165,9 +183,9 @@ public sealed class WasapiLoopbackCapture : IDisposable
         // First, convert bytes to float samples based on capture format
         float[] inputSamples;
 
-        if (_captureFormat.Encoding == WaveFormatEncoding.IeeeFloat)
+        if (IsFloatFormat(_captureFormat) && _captureFormat.BitsPerSample == 32)
         {
-            // Already float
+            // IEEE Float (most common WASAPI loopback format)
             var floatCount = bytesRecorded / sizeof(float);
             inputSamples = new float[floatCount];
             Buffer.BlockCopy(buffer, 0, inputSamples, 0, bytesRecorded);
@@ -196,9 +214,9 @@ public sealed class WasapiLoopbackCapture : IDisposable
                 inputSamples[i] = sample / 8388608f;
             }
         }
-        else if (_captureFormat.BitsPerSample == 32 && _captureFormat.Encoding == WaveFormatEncoding.Pcm)
+        else if (_captureFormat.BitsPerSample == 32)
         {
-            // 32-bit PCM
+            // 32-bit PCM (non-float)
             var sampleCount = bytesRecorded / 4;
             inputSamples = new float[sampleCount];
             for (int i = 0; i < sampleCount; i++)
@@ -209,7 +227,7 @@ public sealed class WasapiLoopbackCapture : IDisposable
         }
         else
         {
-            // Unknown format - try treating as float
+            // Unknown format - treat as float (WASAPI loopback is always float)
             var floatCount = bytesRecorded / sizeof(float);
             inputSamples = new float[floatCount];
             Buffer.BlockCopy(buffer, 0, inputSamples, 0, bytesRecorded);

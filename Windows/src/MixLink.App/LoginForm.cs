@@ -206,6 +206,22 @@ public sealed class LoginForm : Form
         if (on) _errorLabel.Visible = false;
     }
 
+    // Allow dragging the borderless window by its background
+    private const int WM_NCHITTEST = 0x84;
+    private const int HTCAPTION = 0x2;
+
+    protected override void WndProc(ref Message m)
+    {
+        if (m.Msg == WM_NCHITTEST)
+        {
+            base.WndProc(ref m);
+            if (m.Result == (IntPtr)1) // HTCLIENT
+                m.Result = (IntPtr)HTCAPTION;
+            return;
+        }
+        base.WndProc(ref m);
+    }
+
     private static void OpenUrl(string url)
     {
         try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); } catch { }
@@ -239,11 +255,15 @@ public sealed class LoginForm : Form
             _placeholder = placeholder;
             DoubleBuffered = true;
             BackColor = MixLinkTheme.Background;
+            // Compute the exact blended color: 15% white over Background(20,20,20)
+            // so the TextBox matches the rounded rect fill with no visible seam
+            int bg = MixLinkTheme.Background.R; // 20
+            int blended = bg + (int)((255 - bg) * 38.0 / 255.0); // ≈ 55
             _box = new TextBox
             {
                 BorderStyle = BorderStyle.None,
                 ForeColor = Color.White,
-                BackColor = Color.FromArgb(58, 58, 58),
+                BackColor = Color.FromArgb(blended, blended, blended),
                 Font = new Font("Segoe UI", 12),
                 UseSystemPasswordChar = isPassword,
             };

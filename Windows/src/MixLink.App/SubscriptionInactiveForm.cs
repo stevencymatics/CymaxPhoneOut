@@ -101,6 +101,22 @@ public sealed class SubscriptionInactiveForm : Form
         Controls.Add(support);
     }
 
+    // Allow dragging the borderless window by its background
+    private const int WM_NCHITTEST = 0x84;
+    private const int HTCAPTION = 0x2;
+
+    protected override void WndProc(ref Message m)
+    {
+        if (m.Msg == WM_NCHITTEST)
+        {
+            base.WndProc(ref m);
+            if (m.Result == (IntPtr)1) // HTCLIENT
+                m.Result = (IntPtr)HTCAPTION;
+            return;
+        }
+        base.WndProc(ref m);
+    }
+
     [DllImport("gdi32.dll", SetLastError = true)]
     private static extern IntPtr CreateRoundRectRgn(int x1, int y1, int x2, int y2, int cx, int cy);
 
