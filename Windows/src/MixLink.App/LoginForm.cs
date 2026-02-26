@@ -14,6 +14,7 @@ public sealed class LoginForm : Form
     private readonly Label _errorLabel;
 
     public bool LoginSuccess { get; private set; }
+    public VerifyResult? LastVerifyResult { get; private set; }
 
     public LoginForm()
     {
@@ -167,6 +168,8 @@ public sealed class LoginForm : Form
             if (result.AccessGranted)
             {
                 LicenseService.SaveCredentials(email, password);
+                LicenseService.MarkVerificationSuccess();
+                LastVerifyResult = result;
                 LoginSuccess = true;
                 DialogResult = DialogResult.OK;
                 Close();

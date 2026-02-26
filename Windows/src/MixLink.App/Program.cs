@@ -55,12 +55,58 @@ internal static class Program
             }
         };
 
-        // Verify license before launching the app
-        using var loginForm = new LoginForm();
-        var result = loginForm.ShowDialog();
+        // Subscription verification with grace period
+        var creds = LicenseService.LoadCredentials();
+        bool authorized = false;
+        bool needsBackgroundVerify = false;
 
-        if (result != DialogResult.OK || !loginForm.LoginSuccess)
-            return;
+        if (creds is not null && LicenseService.IsWithinGracePeriod())
+        {
+            // Within grace period — skip login, background verify will run in TrayApplication
+            authorized = true;
+            needsBackgroundVerify = true;
+        }
+        else if (creds is not null)
+        {
+            // Have credentials but grace expired — must verify before granting access
+            using var verifyForm = new VerifyingForm(creds.Email, creds.Password);
+            verifyForm.ShowDialog();
+
+            if (verifyForm.Result is { AccessGranted: true })
+            {
+                LicenseService.MarkVerificationSuccess();
+                UpdateForm.CheckAndPrompt(verifyForm.Result);
+                authorized = true;
+            }
+            else if (verifyForm.Result is { Reason: "invalid_credentials" })
+            {
+                LicenseService.ClearCredentials();
+                LicenseService.ClearGracePeriod();
+                // Fall through to login
+            }
+            else if (verifyForm.Result is not null)
+            {
+                // inactive_subscription or no_purchase — show inactive screen and exit
+                LicenseService.ClearGracePeriod();
+                using var inactive = new SubscriptionInactiveForm(verifyForm.Result.ViewPlansUrl);
+                inactive.ShowDialog();
+                return;
+            }
+            // Network error (result is null) falls through to login
+        }
+
+        if (!authorized)
+        {
+            using var loginForm = new LoginForm();
+            var loginResult = loginForm.ShowDialog();
+
+            if (loginResult != DialogResult.OK || !loginForm.LoginSuccess)
+                return;
+
+            // Check for update using the verify result from login
+            if (loginForm.LastVerifyResult is not null)
+                UpdateForm.CheckAndPrompt(loginForm.LastVerifyResult);
+        }
 
         // Show onboarding on first launch
         if (!OnboardingForm.IsComplete)
@@ -71,6 +117,6 @@ internal static class Program
         }
 
         // License verified — run the application
-        Application.Run(new TrayApplication());
+        Application.Run(new TrayApplication(backgroundVerify: needsBackgroundVerify));
     }
 }

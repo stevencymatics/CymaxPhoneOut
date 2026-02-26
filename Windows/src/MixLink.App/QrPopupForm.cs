@@ -45,7 +45,7 @@ public sealed class QrPopupForm : Form
         Controls.Add(minimize);
 
         var menu = new ContextMenuStrip();
-        menu.Items.Add("Sign Out", null, (_, _) => { LicenseService.ClearCredentials(); Application.Exit(); });
+        menu.Items.Add("Sign Out", null, (_, _) => { LicenseService.ClearCredentials(); LicenseService.ClearGracePeriod(); Application.Exit(); });
         menu.Items.Add("Help", null, (_, _) => { try { Process.Start(new ProcessStartInfo("https://cymatics.fm/pages/mix-link-faq") { UseShellExecute = true }); } catch { } });
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Quit", null, (_, _) => Application.Exit());

@@ -13,7 +13,7 @@ public sealed class TrayApplication : ApplicationContext
     private readonly ToolStripMenuItem _startStopItem;
     private readonly ToolStripMenuItem _clientsItem;
 
-    public TrayApplication()
+    public TrayApplication(bool backgroundVerify = false)
     {
         _appState = new AppState();
         _appState.OnStateChanged += UpdateTrayIcon;
@@ -46,6 +46,51 @@ public sealed class TrayApplication : ApplicationContext
 
         // Auto-show the QR popup on launch
         ShowQrPopup();
+
+        if (backgroundVerify)
+            RunBackgroundVerify();
+    }
+
+    private async void RunBackgroundVerify()
+    {
+        var creds = LicenseService.LoadCredentials();
+        if (creds is null) return;
+
+        try
+        {
+            var result = await LicenseService.VerifyAsync(creds.Email, creds.Password);
+
+            if (result.AccessGranted)
+            {
+                LicenseService.MarkVerificationSuccess();
+                UpdateForm.CheckAndPrompt(result);
+            }
+            else if (result.Reason == "invalid_credentials")
+            {
+                LicenseService.ClearCredentials();
+                LicenseService.ClearGracePeriod();
+                SignOutAndExit();
+            }
+            else if (!LicenseService.IsWithinGracePeriod())
+            {
+                LicenseService.ClearGracePeriod();
+                SignOutAndExit();
+            }
+            // If within grace period and subscription inactive, keep running
+        }
+        catch
+        {
+            // Network error — only revoke if grace period has also expired
+            if (!LicenseService.IsWithinGracePeriod())
+                SignOutAndExit();
+        }
+    }
+
+    private void SignOutAndExit()
+    {
+        _trayIcon.Visible = false;
+        _appState.Dispose();
+        Application.Exit();
     }
 
     private void OnTrayClick(object? sender, EventArgs e)
