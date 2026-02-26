@@ -922,7 +922,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
         
         function handleAudioPacket(data) {
             packetsReceived++;
-            
+
             if (packetsReceived === 1) {
                 debugLog('First packet received! Size: ' + data.byteLength + ' bytes');
             }
@@ -1030,27 +1030,27 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
         }
         
         let underrunCount = 0;
-        let smoothedRateAdjust = 0;   // Smoothed playback rate offset (±0.5% max)
-        let fractionalFrameAccum = 0; // Sub-frame remainder accumulator
-        let fadeInRemaining = 0;      // Frames left in fade-in ramp after rebuffer
-        let lastSampleL = 0;          // Last output sample (for smooth underrun fade-out)
-        let lastSampleR = 0;
-        const FADE_FRAMES = 64;       // ~1.3ms fade at 48kHz — enough to eliminate clicks
 
         function processAudio(e) {
             const outputL = e.outputBuffer.getChannelData(0);
             const outputR = e.outputBuffer.getChannelData(1);
             const frameCount = outputL.length;
 
-            // Prebuffering phase
+            // Check if we have enough buffered data
+            const samplesNeeded = frameCount * 2; // stereo
+
+            // Prebuffering phase - wait until we have enough buffer before starting
+            // Use smaller threshold for initial start, larger for recovery after underrun
             const currentThreshold = isInitialStart ? prebufferSamples : rebufferSamples;
 
             if (isPrebuffering) {
                 if (bufferedSamples < currentThreshold) {
+                    // Still prebuffering - output silence
                     for (let i = 0; i < frameCount; i++) {
                         outputL[i] = 0;
                         outputR[i] = 0;
                     }
+                    // Only log prebuffer status once per second (not every callback)
                     if (packetsReceived > 0 && packetsReceived % 200 === 0) {
                         const pct = Math.round((bufferedSamples / currentThreshold) * 100);
                         const mode = isInitialStart ? 'Starting' : 'Rebuffering';
@@ -1059,95 +1059,33 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
                     return;
                 } else {
                     isPrebuffering = false;
-                    isInitialStart = false;
-                    fadeInRemaining = FADE_FRAMES;
-                    smoothedRateAdjust = 0;
-                    fractionalFrameAccum = 0;
+                    isInitialStart = false;  // After first start, use rebuffer threshold
                     debugLog('Playback started with ' + Math.round(bufferedSamples/2/outputRate*1000) + 'ms buffer', 'info');
                 }
             }
 
-            // Adaptive rate control: nudge consumption speed to hold buffer at target.
-            // Non-linear gain: gentle for small drift, aggressive for large drift.
-            // This absorbs WiFi jitter, corrects clock drift, and prevents buffer overflow.
-            const bufferMs = (bufferedSamples / 2) / outputRate * 1000;
-            const errorMs = bufferMs - TARGET_BUFFER_MS;
-            const absError = Math.abs(errorMs);
-            // Non-linear: quadratic gain that scales with error magnitude
-            // ±10ms error → 0.05% adjust (inaudible)
-            // ±40ms error → 0.4% adjust (inaudible)
-            // ±100ms error → 1.5% adjust (inaudible, ~26 cents)
-            // ±200ms error → 3% adjust (barely perceptible, forces convergence)
-            const gain = 0.00003 + absError * 0.000005;
-            const rawAdjust = Math.max(-0.03, Math.min(0.03, errorMs * gain));
-            smoothedRateAdjust = smoothedRateAdjust * 0.93 + rawAdjust * 0.07;
-
-            // Calculate source frames to consume (with sub-frame accumulator for precision)
-            const exactReadFrames = frameCount * (1 + smoothedRateAdjust) + fractionalFrameAccum;
-            const readFrames = Math.floor(exactReadFrames);
-            fractionalFrameAccum = exactReadFrames - readFrames;
-            const readSamples = readFrames * 2;
-
-            if (bufferedSamples < readSamples + 2) {
-                // Underrun — fade out from last values to avoid click, then rebuffer
+            if (bufferedSamples < samplesNeeded) {
+                // Underrun - output silence and start rebuffering
                 underrunCount++;
-                isPrebuffering = true;
-                smoothedRateAdjust = 0;
-                fractionalFrameAccum = 0;
-                debugLog('Buffer underrun #' + underrunCount + ', have ' + Math.round(bufferMs) + 'ms - rebuffering...', 'warn');
+                isPrebuffering = true;  // Go back to prebuffering (will use rebufferSamples)
+                debugLog('Buffer underrun #' + underrunCount + ', need ' + samplesNeeded + ', have ' + bufferedSamples + ' - rebuffering...', 'warn');
                 for (let i = 0; i < frameCount; i++) {
-                    const fade = i < FADE_FRAMES ? 1 - (i / FADE_FRAMES) : 0;
-                    outputL[i] = lastSampleL * fade;
-                    outputR[i] = lastSampleR * fade;
+                    outputL[i] = 0;
+                    outputR[i] = 0;
                 }
                 return;
             }
 
-            // Read from ring buffer and produce output
-            if (readFrames === frameCount) {
-                // Fast path: 1:1, no interpolation needed
-                for (let i = 0; i < frameCount; i++) {
-                    outputL[i] = audioBuffer[readPos];
-                    readPos = (readPos + 1) % BUFFER_SIZE;
-                    outputR[i] = audioBuffer[readPos];
-                    readPos = (readPos + 1) % BUFFER_SIZE;
-                }
-            } else {
-                // Resample readFrames → frameCount via linear interpolation
-                const ratio = readFrames / frameCount;
-                for (let i = 0; i < frameCount; i++) {
-                    const srcPos = i * ratio;
-                    const srcIdx = Math.floor(srcPos);
-                    const frac = srcPos - srcIdx;
-                    const nextIdx = Math.min(srcIdx + 1, readFrames - 1);
+            // Read interleaved samples and de-interleave
+            for (let i = 0; i < frameCount; i++) {
+                outputL[i] = audioBuffer[readPos];
+                readPos = (readPos + 1) % BUFFER_SIZE;
 
-                    const pos0 = (readPos + srcIdx * 2) % BUFFER_SIZE;
-                    const pos1 = (readPos + nextIdx * 2) % BUFFER_SIZE;
-
-                    outputL[i] = audioBuffer[pos0] + (audioBuffer[pos1] - audioBuffer[pos0]) * frac;
-                    outputR[i] = audioBuffer[(pos0 + 1) % BUFFER_SIZE] +
-                        (audioBuffer[(pos1 + 1) % BUFFER_SIZE] - audioBuffer[(pos0 + 1) % BUFFER_SIZE]) * frac;
-                }
-                readPos = (readPos + readSamples) % BUFFER_SIZE;
+                outputR[i] = audioBuffer[readPos];
+                readPos = (readPos + 1) % BUFFER_SIZE;
             }
 
-            bufferedSamples -= readSamples;
-
-            // Fade-in after rebuffer to prevent click
-            if (fadeInRemaining > 0) {
-                const startFade = FADE_FRAMES - fadeInRemaining;
-                const framesToFade = Math.min(fadeInRemaining, frameCount);
-                for (let i = 0; i < framesToFade; i++) {
-                    const gain = (startFade + i) / FADE_FRAMES;
-                    outputL[i] *= gain;
-                    outputR[i] *= gain;
-                }
-                fadeInRemaining -= framesToFade;
-            }
-
-            // Track last output values for smooth underrun transition
-            lastSampleL = outputL[frameCount - 1];
-            lastSampleR = outputR[frameCount - 1];
+            bufferedSamples -= samplesNeeded;
         }
         
         function setVolume(value) {

@@ -15,6 +15,8 @@ struct VerifyResult {
     let accessGranted: Bool
     let reason: String?
     let viewPlansUrl: String?
+    let latestVersion: String?
+    let updateUrl: String?
 }
 
 enum SubscriptionServiceError: LocalizedError {
@@ -74,10 +76,12 @@ actor SubscriptionService {
         }
 
         // Build JSON payload matching the worker's expected format
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0"
         let payload: [String: String] = [
             "email": email,
             "password": password,
-            "product_slug": SubscriptionConfig.productSlug
+            "product_slug": SubscriptionConfig.productSlug,
+            "app_version": appVersion
         ]
 
         var request = URLRequest(url: url)
@@ -113,13 +117,17 @@ actor SubscriptionService {
         let accessGranted = json["access_granted"] as? Bool ?? false
         let reason = json["reason"] as? String
         let viewPlansUrl = json["view_plans_url"] as? String
+        let latestVersion = json["latest_version"] as? String
+        let updateUrl = json["update_url"] as? String
 
-        log("Worker response — access_granted: \(accessGranted), reason: \(reason ?? "nil")")
+        log("Worker response — access_granted: \(accessGranted), reason: \(reason ?? "nil"), latest_version: \(latestVersion ?? "nil")")
 
         return VerifyResult(
             accessGranted: accessGranted,
             reason: reason,
-            viewPlansUrl: viewPlansUrl
+            viewPlansUrl: viewPlansUrl,
+            latestVersion: latestVersion,
+            updateUrl: updateUrl
         )
     }
 }

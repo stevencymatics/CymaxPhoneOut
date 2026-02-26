@@ -67,6 +67,9 @@ class AppState: ObservableObject {
     // Grace period — UserDefaults key for the last successful verification timestamp
     private static let lastVerifiedKey = "com.cymatics.mixlink.lastVerifiedAt"
 
+    // Update check — stores the version the user dismissed so we don't nag every launch
+    private static let dismissedUpdateVersionKey = "com.cymatics.mixlink.dismissedUpdateVersion"
+
     // Server state
     @Published var isServerRunning: Bool = false
     @Published var webClientsConnected: Int = 0
@@ -107,7 +110,7 @@ class AppState: ObservableObject {
         updateQRCode()
         setupSleepWakeObservers()
 
-        // Check permission immediately so the walkthrough shows on first open
+        // Check permission so the walkthrough shows on first open
         if !SystemAudioCapture.hasPermission() {
             needsPermission = true
         }
@@ -118,16 +121,17 @@ class AppState: ObservableObject {
             savedEmail = creds.email
             savedPassword = creds.password
 
-            // If we have a valid grace period or previous success, show app immediately
-            // and verify in background. Otherwise show checking state.
+            // If we verified recently, show app immediately and verify in background.
+            // Otherwise, block on verification — don't grant access without proof.
             if isWithinGracePeriod() {
                 subscriptionStatus = .active
                 log("Within grace period — showing app immediately")
+                backgroundVerify(email: creds.email, password: creds.password)
             } else {
-                subscriptionStatus = .active
-                log("No grace period — showing app while verifying in background")
+                subscriptionStatus = .checking
+                log("Grace period expired — must verify before granting access")
+                foregroundVerify(email: creds.email, password: creds.password)
             }
-            backgroundVerify(email: creds.email, password: creds.password)
         }
     }
     
@@ -380,19 +384,10 @@ class AppState: ObservableObject {
     
     /// Open System Settings to Screen Recording permission pane
     func openScreenRecordingSettings() {
-        // Bring app to foreground so the system permission dialog appears on top
-        NSApp.activate(ignoringOtherApps: true)
-
-        // Register the app in the Screen Recording permissions list so
-        // the user sees a toggle instead of having to manually click "+"
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            _ = SystemAudioCapture.requestPermission()
-        }
-
-        // Open Settings after a longer delay so the system dialog clears first
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-            SystemAudioCapture.openSystemSettings()
-        }
+        // Register the app in the permissions list (adds the toggle)
+        _ = SystemAudioCapture.requestPermission()
+        // Open Settings immediately — the toggle is now there
+        SystemAudioCapture.openSystemSettings()
         log("Opened System Settings - please grant permission", level: .info)
     }
     
@@ -474,23 +469,21 @@ class AppState: ObservableObject {
     
     // MARK: - Network Refresh
 
-    /// Re-detect IP address and update QR code + served HTML without restarting the server
+    /// Re-detect IP address and restart the server on the new network.
+    /// A full stop/start cycle ensures the TCP listener binds cleanly after a network change.
     func refreshNetwork() {
         guard isServerRunning else { return }
 
-        guard let localIP = QRCodeGenerator.getLocalIPAddress() else {
-            log("Cannot detect IP address", level: .warning)
-            return
+        log("Network change detected — restarting server...")
+        stopServer()
+
+        // Brief delay to let the new network interface settle
+        Task {
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s
+            await MainActor.run {
+                self.startServer()
+            }
         }
-
-        let hostName = Host.current().localizedName ?? "Mac"
-        let htmlContent = getWebPlayerHTML(wsPort: httpPort, hostIP: localIP, hostName: hostName)
-
-        httpServer?.htmlContent = htmlContent
-        webPlayerURL = "http://\(localIP):\(httpPort)"
-        updateQRCode()
-
-        log("Network refreshed: \(webPlayerURL ?? "unknown")")
     }
 
     // MARK: - QR Code
@@ -557,6 +550,8 @@ class AppState: ObservableObject {
                     password: password
                 )
                 await MainActor.run {
+                    self.checkForUpdate(result: result)
+
                     if result.accessGranted {
                         self.savedEmail = email
                         self.savedPassword = password
@@ -635,6 +630,9 @@ class AppState: ObservableObject {
                     self.isBackgroundVerifying = false
                     self.viewPlansUrl = result.viewPlansUrl
 
+                    // Check for app updates regardless of subscription status
+                    self.checkForUpdate(result: result)
+
                     if result.accessGranted {
                         self.markVerificationSuccess()
                         self.log("Background verification passed", level: .info)
@@ -659,8 +657,57 @@ class AppState: ObservableObject {
             } catch {
                 await MainActor.run {
                     self.isBackgroundVerifying = false
-                    // Network errors or transient issues — keep user logged in
-                    self.log("Background verification failed (network/transient): \(error.localizedDescription) — keeping access", level: .warning)
+                    if self.isWithinGracePeriod() {
+                        self.log("Background verification failed — within grace period, keeping access", level: .warning)
+                    } else {
+                        self.log("Background verification failed — grace period expired, revoking access", level: .warning)
+                        self.subscriptionStatus = .inactive
+                        KeychainHelper.clearCredentials()
+                        self.clearGracePeriod()
+                    }
+                }
+            }
+        }
+    }
+
+    /// Verify subscription in the foreground — app stays in `.checking` state until resolved.
+    /// Used when grace period has expired and we need proof before granting access.
+    private func foregroundVerify(email: String, password: String) {
+        log("Starting foreground verification for \(email)", level: .info)
+
+        Task {
+            do {
+                let result = try await subscriptionService.verifyLicense(
+                    email: email,
+                    password: password
+                )
+                await MainActor.run {
+                    self.viewPlansUrl = result.viewPlansUrl
+                    self.checkForUpdate(result: result)
+
+                    if result.accessGranted {
+                        self.markVerificationSuccess()
+                        self.subscriptionStatus = .active
+                        self.log("Foreground verification passed — access granted", level: .info)
+                    } else if result.reason == "invalid_credentials" {
+                        self.log("Foreground verification: credentials invalid — requiring re-login", level: .warning)
+                        self.subscriptionStatus = .notChecked
+                        self.subscriptionError = "Your session has expired. Please sign in again."
+                        KeychainHelper.clearCredentials()
+                        self.clearGracePeriod()
+                    } else {
+                        // Subscription inactive / no purchase
+                        self.log("Foreground verification: subscription inactive — locking out", level: .warning)
+                        self.subscriptionStatus = .inactive
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    // Network error with no grace period — stay locked
+                    let message = "Cannot reach server. Check your internet connection and try again."
+                    self.subscriptionStatus = .loginFailed(message)
+                    self.subscriptionError = message
+                    self.log("Foreground verification failed (network): \(error.localizedDescription) — staying locked", level: .error)
                 }
             }
         }
@@ -677,8 +724,64 @@ class AppState: ObservableObject {
         log("User signed out — credentials and grace period cleared", level: .info)
     }
 
+    // MARK: - Update Check
+
+    /// Check if the worker returned a newer version and prompt the user once per version.
+    private func checkForUpdate(result: VerifyResult) {
+        guard let latestVersion = result.latestVersion,
+              let updateUrl = result.updateUrl,
+              let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+        else { return }
+
+        // Compare versions — only prompt if latest is strictly newer
+        guard isVersion(latestVersion, newerThan: currentVersion) else {
+            log("App is up to date (current: \(currentVersion), latest: \(latestVersion))", level: .info)
+            return
+        }
+
+        // Don't nag if the user already dismissed this version
+        let dismissed = UserDefaults.standard.string(forKey: Self.dismissedUpdateVersionKey)
+        if dismissed == latestVersion {
+            log("Update \(latestVersion) available but user previously dismissed", level: .info)
+            return
+        }
+
+        log("Update available: \(currentVersion) → \(latestVersion)", level: .info)
+
+        let alert = NSAlert()
+        alert.messageText = "Update Available"
+        alert.informativeText = "Cymatics Mix Link \(latestVersion) is available."
+        alert.addButton(withTitle: "Download")
+        alert.addButton(withTitle: "Later")
+        alert.alertStyle = .informational
+
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            if let url = URL(string: updateUrl) {
+                NSWorkspace.shared.open(url)
+            }
+        } else {
+            // Remember this version so we don't prompt again
+            UserDefaults.standard.set(latestVersion, forKey: Self.dismissedUpdateVersionKey)
+        }
+    }
+
+    /// Simple semantic version comparison (supports "1.0", "1.0.0", "1.2.3", etc.)
+    private func isVersion(_ a: String, newerThan b: String) -> Bool {
+        let partsA = a.split(separator: ".").compactMap { Int($0) }
+        let partsB = b.split(separator: ".").compactMap { Int($0) }
+        let maxLen = max(partsA.count, partsB.count)
+        for i in 0..<maxLen {
+            let va = i < partsA.count ? partsA[i] : 0
+            let vb = i < partsB.count ? partsB[i] : 0
+            if va > vb { return true }
+            if va < vb { return false }
+        }
+        return false
+    }
+
     // MARK: - Logging
-    
+
     func log(_ message: String, level: LogLevel = .info) {
         let line = "[\(level.rawValue)] \(message)\n"
         print(line, terminator: "")

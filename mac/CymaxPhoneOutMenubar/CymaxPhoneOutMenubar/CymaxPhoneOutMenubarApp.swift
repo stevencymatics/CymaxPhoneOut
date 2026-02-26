@@ -45,9 +45,9 @@ private func makeMenuBarIcon(slashed: Bool) -> NSImage {
     if slashed {
         NSColor.black.setStroke()
         let slash = NSBezierPath()
-        slash.move(to: NSPoint(x: totalW * 0.85, y: maxH * 0.9))
-        slash.line(to: NSPoint(x: totalW * 0.15, y: maxH * 0.1))
-        slash.lineWidth = 2.0
+        slash.move(to: NSPoint(x: totalW - 1, y: maxH - 1))
+        slash.line(to: NSPoint(x: 1, y: 1))
+        slash.lineWidth = 1.5
         slash.lineCapStyle = .round
         slash.stroke()
     }
