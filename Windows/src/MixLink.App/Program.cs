@@ -17,12 +17,13 @@ internal static class Program
 
         if (!createdNew)
         {
-            MessageBox.Show(
-                "Cymatics Mix Link is already running.\nCheck the system tray.",
-                "Cymatics Mix Link",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information
-            );
+            // Signal the running instance to show its window, then exit
+            try
+            {
+                using var show = EventWaitHandle.OpenExisting("MixLink.Windows.ShowUI");
+                show.Set();
+            }
+            catch { }
             return;
         }
 

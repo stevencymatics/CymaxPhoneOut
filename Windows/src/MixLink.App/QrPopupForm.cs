@@ -96,18 +96,30 @@ public sealed class QrPopupForm : Form
         Controls.Add(_scanHint);
         y += 20;
 
+        int refreshBtnSize = 26;
+        int urlAreaW = cw - refreshBtnSize - 6;
+
         _urlLabel = new Label
         {
             Font = new Font("Consolas", 9),
             ForeColor = MixLinkTheme.Cyan,
             AutoSize = false,
-            Size = new Size(cw, 16),
+            Size = new Size(urlAreaW, 16),
             TextAlign = ContentAlignment.MiddleCenter,
             Location = new Point(pad, y),
             Cursor = Cursors.Hand
         };
         _urlLabel.Click += OnUrlClick;
         Controls.Add(_urlLabel);
+
+        var refreshBtn = new RefreshButton
+        {
+            Size = new Size(refreshBtnSize, refreshBtnSize),
+            Location = new Point(pad + urlAreaW + 6, y - 5),
+            Cursor = Cursors.Hand
+        };
+        refreshBtn.Click += (_, _) => _appState.RefreshNetwork();
+        Controls.Add(refreshBtn);
         y += 26;
 
         var statusPanel = new Panel
@@ -251,6 +263,51 @@ public sealed class QrPopupForm : Form
                 MixLinkPaint.FillRoundedRect(e.Graphics, b, new RectangleF(x, Height - hs[i], bw, hs[i]), 1f);
                 x += bw + gap;
             }
+        }
+    }
+
+    private sealed class RefreshButton : Control
+    {
+        public RefreshButton() => SetStyle(ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true);
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.Clear(Parent?.BackColor ?? MixLinkTheme.Background);
+
+            // Background pill
+            using var bg = new SolidBrush(Color.FromArgb(25, MixLinkTheme.Cyan));
+            MixLinkPaint.FillRoundedRect(g, bg, new RectangleF(0, 0, Width, Height), 6);
+
+            // Gridicons refresh icon (24×24 viewBox)
+            using var path = new GraphicsPath();
+            path.AddBezier(17.91f, 14f, 17.432f, 16.833f, 14.967f, 19f, 12f, 19f);
+            path.AddBezier(12f, 19f, 8.692f, 19f, 6f, 16.308f, 6f, 13f);
+            path.AddBezier(6f, 13f, 6f, 9.692f, 8.692f, 7f, 12f, 7f);
+            path.AddLine(12f, 7f, 14.172f, 7f);
+            path.AddLine(14.172f, 7f, 12.086f, 9.086f);
+            path.AddLine(12.086f, 9.086f, 13.5f, 10.5f);
+            path.AddLine(13.5f, 10.5f, 18f, 6f);
+            path.AddLine(18f, 6f, 13.5f, 1.5f);
+            path.AddLine(13.5f, 1.5f, 12.086f, 2.914f);
+            path.AddLine(12.086f, 2.914f, 14.172f, 5f);
+            path.AddLine(14.172f, 5f, 12f, 5f);
+            path.AddBezier(12f, 5f, 7.582f, 5f, 4f, 8.582f, 4f, 13f);
+            path.AddBezier(4f, 13f, 4f, 17.418f, 7.582f, 21f, 12f, 21f);
+            path.AddBezier(12f, 21f, 16.08f, 21f, 19.438f, 17.945f, 19.93f, 14f);
+            path.AddLine(19.93f, 14f, 17.91f, 14f);
+            path.CloseFigure();
+
+            // Scale and center within the button
+            float scale = (System.Math.Min(Width, Height) - 2f) / 24f;
+            using var mx = new Matrix();
+            mx.Translate((Width - 24f * scale) / 2f, (Height - 24f * scale) / 2f);
+            mx.Scale(scale, scale);
+            path.Transform(mx);
+
+            using var fill = new SolidBrush(MixLinkTheme.Cyan);
+            g.FillPath(fill, path);
         }
     }
 }

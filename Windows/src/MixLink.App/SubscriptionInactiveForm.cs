@@ -39,7 +39,7 @@ public sealed class SubscriptionInactiveForm : Form
             Close();
         });
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Quit", null, (_, _) => Application.Exit());
+        menu.Items.Add("Quit", null, (_, _) => Close());
         var hamburger = new HamburgerButton { Location = new Point(Width - 14 - 28, 10) };
         hamburger.Click += (_, _) => menu.Show(hamburger, new Point(0, hamburger.Height));
         Controls.Add(hamburger);
@@ -80,15 +80,15 @@ public sealed class SubscriptionInactiveForm : Form
         var msg = new Label
         {
             Text = "Your subscription isn't active",
-            Font = new Font("Segoe UI Semibold", 15),
+            Font = new Font("Segoe UI Semibold", 13),
             ForeColor = Color.White,
             AutoSize = false,
-            Size = new Size(260, 56),
+            Size = new Size(260, 28),
             TextAlign = ContentAlignment.MiddleCenter,
             Location = new Point(20, y)
         };
         Controls.Add(msg);
-        y += 64;
+        y += 38;
 
         var btn = new MixLinkButton
         {

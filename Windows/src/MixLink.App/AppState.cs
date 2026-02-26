@@ -125,6 +125,20 @@ public sealed class AppState : IDisposable
     }
 
     /// <summary>
+    /// Re-detect IP address and restart the server on the new network.
+    /// </summary>
+    public void RefreshNetwork()
+    {
+        if (!IsServerRunning) return;
+
+        Log("Network refresh — restarting server...", LogLevel.Info);
+        StopServer();
+
+        // Brief delay to let the new network interface settle
+        Task.Delay(500).ContinueWith(_ => StartServer(), TaskScheduler.Default);
+    }
+
+    /// <summary>
     /// Start the server and audio capture.
     /// </summary>
     public void StartServer()

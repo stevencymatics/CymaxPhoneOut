@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Drawing.Drawing2D;
+using System.Threading;
 using System.Windows.Forms;
 
 namespace MixLink.App;
@@ -12,6 +13,9 @@ public sealed class TrayApplication : ApplicationContext
     private QrPopupForm? _qrPopup;
     private readonly ToolStripMenuItem _startStopItem;
     private readonly ToolStripMenuItem _clientsItem;
+    private readonly SynchronizationContext _syncContext;
+    private readonly EventWaitHandle _showUiEvent;
+    private readonly RegisteredWaitHandle _showUiWait;
 
     public TrayApplication(bool backgroundVerify = false)
     {
@@ -49,6 +53,14 @@ public sealed class TrayApplication : ApplicationContext
 
         if (backgroundVerify)
             RunBackgroundVerify();
+
+        // Listen for second-instance launches and show the QR popup
+        _syncContext = SynchronizationContext.Current!;
+        _showUiEvent = new EventWaitHandle(false, EventResetMode.AutoReset, "MixLink.Windows.ShowUI");
+        _showUiWait = ThreadPool.RegisterWaitForSingleObject(_showUiEvent, (_, __) =>
+        {
+            _syncContext.Post(_ => ShowQrPopup(), null);
+        }, null, -1, false);
     }
 
     private async void RunBackgroundVerify()
@@ -212,6 +224,8 @@ public sealed class TrayApplication : ApplicationContext
     {
         if (disposing)
         {
+            _showUiWait.Unregister(_showUiEvent);
+            _showUiEvent.Dispose();
             _trayIcon.Dispose();
             _qrPopup?.Dispose();
             _appState.Dispose();
