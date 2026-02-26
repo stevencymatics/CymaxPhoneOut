@@ -68,31 +68,36 @@ internal static class Program
         }
         else if (creds is not null)
         {
-            // Have credentials but grace expired — must verify before granting access
-            using var verifyForm = new VerifyingForm(creds.Email, creds.Password);
-            verifyForm.ShowDialog();
+            // Have credentials but grace expired — verify silently before showing any UI
+            try
+            {
+                var result = LicenseService.VerifyAsync(creds.Email, creds.Password).GetAwaiter().GetResult();
 
-            if (verifyForm.Result is { AccessGranted: true })
-            {
-                LicenseService.MarkVerificationSuccess();
-                UpdateForm.CheckAndPrompt(verifyForm.Result);
-                authorized = true;
+                if (result.AccessGranted)
+                {
+                    LicenseService.MarkVerificationSuccess();
+                    UpdateForm.CheckAndPrompt(result);
+                    authorized = true;
+                }
+                else if (result.Reason == "invalid_credentials")
+                {
+                    LicenseService.ClearCredentials();
+                    LicenseService.ClearGracePeriod();
+                    // Fall through to login
+                }
+                else
+                {
+                    // inactive_subscription or no_purchase — show inactive screen and exit
+                    LicenseService.ClearGracePeriod();
+                    using var inactive = new SubscriptionInactiveForm(result.ViewPlansUrl);
+                    inactive.ShowDialog();
+                    return;
+                }
             }
-            else if (verifyForm.Result is { Reason: "invalid_credentials" })
+            catch
             {
-                LicenseService.ClearCredentials();
-                LicenseService.ClearGracePeriod();
-                // Fall through to login
+                // Network error — fall through to login
             }
-            else if (verifyForm.Result is not null)
-            {
-                // inactive_subscription or no_purchase — show inactive screen and exit
-                LicenseService.ClearGracePeriod();
-                using var inactive = new SubscriptionInactiveForm(verifyForm.Result.ViewPlansUrl);
-                inactive.ShowDialog();
-                return;
-            }
-            // Network error (result is null) falls through to login
         }
 
         if (!authorized)
