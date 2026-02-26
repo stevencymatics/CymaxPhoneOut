@@ -8,12 +8,15 @@ namespace MixLink.App;
 
 public sealed class SubscriptionInactiveForm : Form
 {
+    /// <summary>Set by hamburger → Sign Out so the caller knows to show the login form.</summary>
+    public bool SignedOut { get; private set; }
+
     public SubscriptionInactiveForm(string? viewPlansUrl)
     {
         Text = "Cymatics Mix Link";
         FormBorderStyle = FormBorderStyle.None;
         StartPosition = FormStartPosition.CenterScreen;
-        Size = new Size(300, 380);
+        Size = new Size(300, 400);
         BackColor = MixLinkTheme.Background;
         DoubleBuffered = true;
 
@@ -27,6 +30,20 @@ public sealed class SubscriptionInactiveForm : Form
         minimize.Click += (_, _) => Close();
         Controls.Add(minimize);
 
+        // Hamburger menu with Sign Out
+        var menu = new ContextMenuStrip();
+        menu.Items.Add("Sign Out", null, (_, _) =>
+        {
+            LicenseService.ClearCredentials();
+            SignedOut = true;
+            Close();
+        });
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Quit", null, (_, _) => Application.Exit());
+        var hamburger = new HamburgerButton { Location = new Point(Width - 14 - 28, 10) };
+        hamburger.Click += (_, _) => menu.Show(hamburger, new Point(0, hamburger.Height));
+        Controls.Add(hamburger);
+
         int y = 36;
 
         var wordmark = new WordmarkPanel { Location = new Point(0, y), Size = new Size(Width, 18) };
@@ -39,12 +56,12 @@ public sealed class SubscriptionInactiveForm : Form
             Font = new Font("Segoe UI Semibold", 24),
             ForeColor = Color.White,
             AutoSize = false,
-            Size = new Size(Width, 34),
+            Size = new Size(Width, 42),
             TextAlign = ContentAlignment.MiddleCenter,
             Location = new Point(0, y)
         };
         Controls.Add(title);
-        y += 50;
+        y += 56;
 
         // Warning icon
         var warn = new Label
@@ -53,12 +70,12 @@ public sealed class SubscriptionInactiveForm : Form
             Font = new Font("Segoe UI", 28),
             ForeColor = Color.Orange,
             AutoSize = false,
-            Size = new Size(Width, 40),
+            Size = new Size(Width, 56),
             TextAlign = ContentAlignment.MiddleCenter,
             Location = new Point(0, y)
         };
         Controls.Add(warn);
-        y += 48;
+        y += 62;
 
         var msg = new Label
         {
@@ -66,12 +83,12 @@ public sealed class SubscriptionInactiveForm : Form
             Font = new Font("Segoe UI Semibold", 15),
             ForeColor = Color.White,
             AutoSize = false,
-            Size = new Size(260, 26),
+            Size = new Size(260, 56),
             TextAlign = ContentAlignment.MiddleCenter,
             Location = new Point(20, y)
         };
         Controls.Add(msg);
-        y += 40;
+        y += 64;
 
         var btn = new MixLinkButton
         {
