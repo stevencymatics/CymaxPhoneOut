@@ -78,6 +78,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        // When the user clicks the Dock icon, open the menu bar panel
+        autoOpenMenuBarPanel()
+        return false
+    }
+
     private func autoOpenMenuBarPanel() {
         NSApp.activate(ignoringOtherApps: true)
 
