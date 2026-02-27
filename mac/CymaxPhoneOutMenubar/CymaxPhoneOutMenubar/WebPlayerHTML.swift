@@ -519,15 +519,20 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
                     document.getElementById('audioState').textContent = audioContext.state;
                 }
                 
-                // Create MediaStream destination - routes audio through HTML5 audio element
-                // This bypasses iOS silent mode because <audio> elements use "playback" category
-                mediaStreamDest = audioContext.createMediaStreamDestination();
-                debugLog('MediaStream destination created');
-                
                 // Create gain node for volume control
                 gainNode = audioContext.createGain();
-                gainNode.connect(mediaStreamDest);  // Connect to MediaStream, not destination
-                debugLog('Gain node created and connected to MediaStream');
+
+                if (isAndroid) {
+                    // Android: connect directly to speakers
+                    // MediaStreamDestination is unreliable on many Android Chrome versions
+                    gainNode.connect(audioContext.destination);
+                    debugLog('Android detected - using direct audioContext.destination');
+                } else {
+                    // iOS/other: route through <audio> element to bypass iOS silent mode
+                    mediaStreamDest = audioContext.createMediaStreamDestination();
+                    gainNode.connect(mediaStreamDest);
+                    debugLog('MediaStream destination created (silent mode bypass)');
+                }
 
                 // Create analyser node for visualizer (FFT on live audio)
                 analyserNode = audioContext.createAnalyser();
@@ -558,15 +563,17 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
                 scriptNode.connect(analyserNode);
                 debugLog('Script processor created (buffer: 512 frames, ~11ms)');
                 
-                // Route MediaStream through HTML5 audio element (bypasses iOS silent mode)
-                const outputAudio = document.getElementById('outputAudio');
-                outputAudio.srcObject = mediaStreamDest.stream;
-                outputAudio.play().then(() => {
-                    debugLog('Audio element playing (silent mode bypass active)');
-                }).catch(e => {
-                    debugLog('Audio element play failed: ' + e.message, 'warn');
-                });
-                
+                if (mediaStreamDest) {
+                    // Route MediaStream through HTML5 audio element (bypasses iOS silent mode)
+                    const outputAudio = document.getElementById('outputAudio');
+                    outputAudio.srcObject = mediaStreamDest.stream;
+                    outputAudio.play().then(() => {
+                        debugLog('Audio element playing (silent mode bypass active)');
+                    }).catch(e => {
+                        debugLog('Audio element play failed: ' + e.message, 'warn');
+                    });
+                }
+
                 // Connect WebSocket
                 connectWebSocket();
                 
@@ -592,11 +599,13 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
             debugLog('Stopping audio...');
             
             // Stop the output audio element
-            try {
-                const outputAudio = document.getElementById('outputAudio');
-                outputAudio.pause();
-                outputAudio.srcObject = null;
-            } catch (e) {}
+            if (mediaStreamDest) {
+                try {
+                    const outputAudio = document.getElementById('outputAudio');
+                    outputAudio.pause();
+                    outputAudio.srcObject = null;
+                } catch (e) {}
+            }
             
             // Close WebSocket if open
             if (ws) {
@@ -685,6 +694,7 @@ func getWebPlayerHTML(wsPort: UInt16, hostIP: String, hostName: String) -> Strin
         // Detect Safari (iOS Safari specifically has WebSocket issues with local network)
         const isSafari = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
         const isIOSSafari = isSafari && /iPhone|iPad|iPod/.test(navigator.userAgent);
+        const isAndroid = /Android/i.test(navigator.userAgent);
         
         async function connectWebSocket() {
             // Warm up network
