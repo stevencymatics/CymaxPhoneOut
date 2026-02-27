@@ -511,25 +511,32 @@ public static class WebPlayerHtml
                     document.getElementById('audioState').textContent = audioContext.state;
                 }}
 
-                mediaStreamDest = audioContext.createMediaStreamDestination();
-                debugLog('MediaStream destination created');
-
                 gainNode = audioContext.createGain();
-                gainNode.connect(mediaStreamDest);
-                debugLog('Gain node created and connected to MediaStream');
+
+                if (isAndroid) {{
+                    // Android: connect directly to speakers
+                    // MediaStreamDestination is unreliable on many Android Chrome versions
+                    gainNode.connect(audioContext.destination);
+                    debugLog('Android detected - using direct audioContext.destination');
+                }} else {{
+                    // iOS/other: route through <audio> element to bypass iOS silent mode
+                    mediaStreamDest = audioContext.createMediaStreamDestination();
+                    gainNode.connect(mediaStreamDest);
+                    debugLog('MediaStream destination created (silent mode bypass)');
+
+                    const outputAudio = document.getElementById('outputAudio');
+                    outputAudio.srcObject = mediaStreamDest.stream;
+                    outputAudio.play().then(() => {{
+                        debugLog('Audio element playing (silent mode bypass active)');
+                    }}).catch(e => {{
+                        debugLog('Audio element play failed: ' + e.message, 'warn');
+                    }});
+                }}
 
                 scriptNode = audioContext.createScriptProcessor(512, 0, 2);
                 scriptNode.onaudioprocess = processAudio;
                 scriptNode.connect(gainNode);
                 debugLog('Script processor created (buffer: 512 frames, ~11ms)');
-
-                const outputAudio = document.getElementById('outputAudio');
-                outputAudio.srcObject = mediaStreamDest.stream;
-                outputAudio.play().then(() => {{
-                    debugLog('Audio element playing (silent mode bypass active)');
-                }}).catch(e => {{
-                    debugLog('Audio element play failed: ' + e.message, 'warn');
-                }});
 
                 connectWebSocket();
 
@@ -552,11 +559,13 @@ public static class WebPlayerHtml
         function stopAudio() {{
             debugLog('Stopping audio...');
 
-            try {{
-                const outputAudio = document.getElementById('outputAudio');
-                outputAudio.pause();
-                outputAudio.srcObject = null;
-            }} catch (e) {{}}
+            if (mediaStreamDest) {{
+                try {{
+                    const outputAudio = document.getElementById('outputAudio');
+                    outputAudio.pause();
+                    outputAudio.srcObject = null;
+                }} catch (e) {{}}
+            }}
 
             if (ws) {{
                 ws.close();
@@ -635,6 +644,7 @@ public static class WebPlayerHtml
 
         const isSafari = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
         const isIOSSafari = isSafari && /iPhone|iPad|iPod/.test(navigator.userAgent);
+        const isAndroid = /Android/i.test(navigator.userAgent);
 
         async function connectWebSocket() {{
             await warmUpNetwork();
