@@ -56,8 +56,7 @@ struct KeychainHelper {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: key,
-            kSecValueData as String: data,
-            kSecUseDataProtectionKeychain as String: true
+            kSecValueData as String: data
         ]
 
         SecItemAdd(query as CFDictionary, nil)
@@ -69,8 +68,7 @@ struct KeychainHelper {
             kSecAttrService as String: service,
             kSecAttrAccount as String: key,
             kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-            kSecUseDataProtectionKeychain as String: true
+            kSecMatchLimit as String: kSecMatchLimitOne
         ]
 
         var result: AnyObject?
