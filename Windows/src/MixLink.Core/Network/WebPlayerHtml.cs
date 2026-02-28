@@ -651,11 +651,12 @@ public static class WebPlayerHtml
 
             const startTime = Date.now();
 
-            if (isIOSSafari) {{
-                debugLog('iOS Safari detected - using HTTP stream', 'info');
-                connectHTTPStream();
-                return;
-            }}
+            // HTTP chunked streaming is more reliable than WebSocket across
+            // all platforms — no handshake failures, no FD limits, works
+            // through stricter browser security policies.
+            debugLog('Using HTTP stream transport', 'info');
+            connectHTTPStream();
+            return;
 
             const url = 'ws://' + WS_HOST + ':' + WS_PORT;
 
