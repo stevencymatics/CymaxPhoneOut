@@ -50,9 +50,22 @@ public sealed class LicenseService
 
     public static void SaveCredentials(string email, string password)
     {
+        // Preserve existing lastVerifiedAt when updating credentials
+        var existing = LoadCredentials();
+        var creds = new StoredCredentials
+        {
+            Email = email,
+            Password = password,
+            LastVerifiedAt = existing?.LastVerifiedAt ?? 0
+        };
+        SaveCredentialsInternal(creds);
+    }
+
+    private static void SaveCredentialsInternal(StoredCredentials creds)
+    {
         Directory.CreateDirectory(CredentialsDir);
 
-        var json = JsonSerializer.Serialize(new StoredCredentials { Email = email, Password = password });
+        var json = JsonSerializer.Serialize(creds);
         var plainBytes = Encoding.UTF8.GetBytes(json);
         var encrypted = ProtectedData.Protect(plainBytes, null, DataProtectionScope.CurrentUser);
         File.WriteAllBytes(CredentialsFile, encrypted);
@@ -107,29 +120,46 @@ public sealed class LicenseService
             try { File.Delete(CredentialsFile); } catch { }
         if (File.Exists(LegacyCredentialsFile))
             try { File.Delete(LegacyCredentialsFile); } catch { }
+        CleanupRegistryGracePeriod();
     }
 
-    // MARK: - Grace Period (Registry)
+    // MARK: - Grace Period (stored in DPAPI-encrypted credentials file)
 
     public static void MarkVerificationSuccess()
     {
-        using var key = Registry.CurrentUser.CreateSubKey(RegistryPath);
-        key.SetValue(LastVerifiedValue, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString());
+        var creds = LoadCredentials();
+        if (creds is null) return;
+        creds.LastVerifiedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        SaveCredentialsInternal(creds);
+        CleanupRegistryGracePeriod();
     }
 
     public static bool IsWithinGracePeriod()
     {
-        using var key = Registry.CurrentUser.OpenSubKey(RegistryPath);
-        if (key?.GetValue(LastVerifiedValue) is not string val) return false;
-        if (!long.TryParse(val, out var lastVerified)) return false;
-        var elapsed = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - lastVerified;
+        var creds = LoadCredentials();
+        if (creds is null || creds.LastVerifiedAt <= 0) return false;
+        var elapsed = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - creds.LastVerifiedAt;
         return elapsed < GracePeriodSeconds;
     }
 
     public static void ClearGracePeriod()
     {
-        using var key = Registry.CurrentUser.OpenSubKey(RegistryPath, writable: true);
-        key?.DeleteValue(LastVerifiedValue, throwOnMissingValue: false);
+        var creds = LoadCredentials();
+        if (creds is null) return;
+        creds.LastVerifiedAt = 0;
+        SaveCredentialsInternal(creds);
+        CleanupRegistryGracePeriod();
+    }
+
+    private static void CleanupRegistryGracePeriod()
+    {
+        // Remove legacy plain-text grace period from Registry
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(RegistryPath, writable: true);
+            key?.DeleteValue(LastVerifiedValue, throwOnMissingValue: false);
+        }
+        catch { }
     }
 
     // MARK: - Update Check
@@ -178,6 +208,9 @@ public class StoredCredentials
 
     [JsonPropertyName("password")]
     public string Password { get; set; } = "";
+
+    [JsonPropertyName("lastVerifiedAt")]
+    public long LastVerifiedAt { get; set; }
 }
 
 public class VerifyResponse
