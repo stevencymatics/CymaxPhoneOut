@@ -56,7 +56,8 @@ struct KeychainHelper {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: key,
-            kSecValueData as String: data
+            kSecValueData as String: data,
+            kSecUseDataProtectionKeychain as String: true
         ]
 
         SecItemAdd(query as CFDictionary, nil)
@@ -68,7 +69,8 @@ struct KeychainHelper {
             kSecAttrService as String: service,
             kSecAttrAccount as String: key,
             kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
+            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecUseDataProtectionKeychain as String: true
         ]
 
         var result: AnyObject?
@@ -84,12 +86,21 @@ struct KeychainHelper {
     }
 
     private static func delete(key: String) {
-        let query: [String: Any] = [
+        // Delete from legacy keychain (cleans up old items from previous versions)
+        let legacyQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: key
         ]
+        SecItemDelete(legacyQuery as CFDictionary)
 
-        SecItemDelete(query as CFDictionary)
+        // Delete from Data Protection keychain
+        let dpQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: key,
+            kSecUseDataProtectionKeychain as String: true
+        ]
+        SecItemDelete(dpQuery as CFDictionary)
     }
 }
