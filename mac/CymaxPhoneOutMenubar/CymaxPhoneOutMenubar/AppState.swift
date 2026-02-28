@@ -64,8 +64,7 @@ class AppState: ObservableObject {
     private var savedEmail: String?
     private var savedPassword: String?
 
-    // Grace period — UserDefaults key for the last successful verification timestamp
-    private static let lastVerifiedKey = "com.cymatics.mixlink.lastVerifiedAt"
+    // Grace period — stored in encrypted auth.dat via KeychainHelper
 
     // Update check — stores the version the user dismissed so we don't nag every launch
     private static let dismissedUpdateVersionKey = "com.cymatics.mixlink.dismissedUpdateVersion"
@@ -504,13 +503,13 @@ class AppState: ObservableObject {
     /// Record a successful verification timestamp.
     private func markVerificationSuccess() {
         let now = Date()
-        UserDefaults.standard.set(now.timeIntervalSince1970, forKey: Self.lastVerifiedKey)
+        KeychainHelper.setLastVerifiedTime(now.timeIntervalSince1970)
         log("Grace period: recorded successful verification at \(now)", level: .info)
     }
 
     /// Returns true if we are still within the grace period from the last successful verification.
     private func isWithinGracePeriod() -> Bool {
-        let lastVerified = UserDefaults.standard.double(forKey: Self.lastVerifiedKey)
+        let lastVerified = KeychainHelper.getLastVerifiedTime()
         guard lastVerified > 0 else {
             log("Grace period: no previous verification on record", level: .info)
             return false
@@ -531,7 +530,7 @@ class AppState: ObservableObject {
 
     /// Clear the grace period timestamp.
     private func clearGracePeriod() {
-        UserDefaults.standard.removeObject(forKey: Self.lastVerifiedKey)
+        KeychainHelper.clearLastVerifiedTime()
     }
 
     // MARK: - Subscription

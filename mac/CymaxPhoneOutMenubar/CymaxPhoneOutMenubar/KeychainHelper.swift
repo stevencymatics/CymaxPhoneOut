@@ -2,9 +2,9 @@
 //  KeychainHelper.swift
 //  CymaxPhoneOutMenubar
 //
-//  Securely stores and retrieves login credentials using an encrypted file.
-//  Uses AES-256-CBC with a PBKDF2-derived key from the hardware UUID.
-//  Also cleans up any legacy Keychain items from previous versions.
+//  Securely stores credentials and grace period in an AES-256 encrypted file.
+//  Uses PBKDF2 key derivation from hardware UUID.
+//  Also cleans up any legacy Keychain items and UserDefaults from previous versions.
 //
 
 import Foundation
@@ -18,21 +18,19 @@ struct KeychainHelper {
     private static let salt: [UInt8] = [0xC7, 0x3A, 0x71, 0xC5, 0x4D, 0x1E, 0xA1, 0x4B,
                                         0xA0, 0xB3, 0xE2, 0x9F, 0x58, 0x6D, 0x17, 0xC4]
 
-    // MARK: - Public API
+    // MARK: - Credentials
 
     static func saveCredentials(email: String, password: String) {
-        let dict: [String: String] = ["email": email, "password": password]
-        guard let json = try? JSONSerialization.data(withJSONObject: dict) else { return }
-        guard let jsonStr = String(data: json, encoding: .utf8) else { return }
-        _ = encryptAndSave(jsonStr)
+        var blob = loadBlob()
+        blob["email"] = email
+        blob["password"] = password
+        _ = saveBlob(blob)
     }
 
     static func loadCredentials() -> (email: String, password: String)? {
-        guard let json = loadAndDecrypt(),
-              let data = json.data(using: .utf8),
-              let dict = try? JSONSerialization.jsonObject(with: data) as? [String: String],
-              let email = dict["email"], !email.isEmpty,
-              let password = dict["password"], !password.isEmpty else {
+        let blob = loadBlob()
+        guard let email = blob["email"] as? String, !email.isEmpty,
+              let password = blob["password"] as? String, !password.isEmpty else {
             return nil
         }
         return (email, password)
@@ -42,10 +40,47 @@ struct KeychainHelper {
         let file = credentialFile()
         try? FileManager.default.removeItem(at: file)
         cleanupKeychain()
+        cleanupUserDefaults()
     }
 
     static var hasSavedCredentials: Bool {
         return loadCredentials() != nil
+    }
+
+    // MARK: - Grace Period (stored in same encrypted blob)
+
+    static func getLastVerifiedTime() -> Double {
+        let blob = loadBlob()
+        return blob["lastVerifiedAt"] as? Double ?? 0.0
+    }
+
+    static func setLastVerifiedTime(_ time: Double) {
+        var blob = loadBlob()
+        blob["lastVerifiedAt"] = time
+        _ = saveBlob(blob)
+    }
+
+    static func clearLastVerifiedTime() {
+        var blob = loadBlob()
+        blob.removeValue(forKey: "lastVerifiedAt")
+        _ = saveBlob(blob)
+    }
+
+    // MARK: - Internal Blob Management
+
+    private static func loadBlob() -> [String: Any] {
+        guard let json = loadAndDecrypt(),
+              let data = json.data(using: .utf8),
+              let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return [:]
+        }
+        return dict
+    }
+
+    private static func saveBlob(_ blob: [String: Any]) -> Bool {
+        guard let data = try? JSONSerialization.data(withJSONObject: blob),
+              let json = String(data: data, encoding: .utf8) else { return false }
+        return encryptAndSave(json)
     }
 
     // MARK: - File Path
@@ -102,12 +137,10 @@ struct KeychainHelper {
         guard let key = deriveKey(),
               let plaintextData = plaintext.data(using: .utf8) else { return false }
 
-        // Generate random IV
         var iv = Data(count: kCCBlockSizeAES128)
         let ivResult = iv.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, kCCBlockSizeAES128, $0.baseAddress!) }
         guard ivResult == errSecSuccess else { return false }
 
-        // Encrypt
         let bufferSize = plaintextData.count + kCCBlockSizeAES128
         var ciphertext = Data(count: bufferSize)
         var bytesEncrypted = 0
@@ -132,7 +165,6 @@ struct KeychainHelper {
         guard status == kCCSuccess else { return false }
         ciphertext.count = bytesEncrypted
 
-        // Write [IV][ciphertext]
         var output = Data()
         output.append(iv)
         output.append(ciphertext)
@@ -181,11 +213,10 @@ struct KeychainHelper {
         return String(data: plaintext, encoding: .utf8)
     }
 
-    // MARK: - Legacy Keychain Cleanup
+    // MARK: - Legacy Cleanup
 
     private static func cleanupKeychain() {
         for account in ["cymatics_email", "cymatics_password"] {
-            // Delete from standard keychain
             let query: [String: Any] = [
                 kSecClass as String: kSecClassGenericPassword,
                 kSecAttrService as String: service,
@@ -193,7 +224,6 @@ struct KeychainHelper {
             ]
             SecItemDelete(query as CFDictionary)
 
-            // Delete from Data Protection keychain
             let dpQuery: [String: Any] = [
                 kSecClass as String: kSecClassGenericPassword,
                 kSecAttrService as String: service,
@@ -202,5 +232,10 @@ struct KeychainHelper {
             ]
             SecItemDelete(dpQuery as CFDictionary)
         }
+    }
+
+    private static func cleanupUserDefaults() {
+        // Remove legacy plain-text grace period from UserDefaults
+        UserDefaults.standard.removeObject(forKey: "com.cymatics.mixlink.lastVerifiedAt")
     }
 }
