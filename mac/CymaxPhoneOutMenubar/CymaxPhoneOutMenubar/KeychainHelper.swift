@@ -95,11 +95,12 @@ struct KeychainHelper {
     // MARK: - Hardware UUID
 
     private static func hardwareUUID() -> String? {
-        let entry = IORegistryEntryFromPath(kIOMainPortDefault, "IOService:/AppleACPIPlatformExpert")
-        guard entry != MACH_PORT_NULL else { return nil }
-        defer { IOObjectRelease(entry) }
+        let service = IOServiceGetMatchingService(kIOMainPortDefault,
+                                                   IOServiceMatching("IOPlatformExpertDevice"))
+        guard service != MACH_PORT_NULL else { return nil }
+        defer { IOObjectRelease(service) }
 
-        guard let cfUUID = IORegistryEntryCreateCFProperty(entry, "IOPlatformUUID" as CFString,
+        guard let cfUUID = IORegistryEntryCreateCFProperty(service, "IOPlatformUUID" as CFString,
                                                             kCFAllocatorDefault, 0)?.takeRetainedValue() as? String else {
             return nil
         }
